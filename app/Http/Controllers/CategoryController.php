@@ -66,6 +66,31 @@ class CategoryController extends Controller
         return Redirect::back()->with('success', 'Catégorie créée avec succès.');
     }
 
+    public function storeQuick(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:categories,name',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        // 1. Création de la catégorie
+        $category = Category::create($validated);
+
+        // 2. Attachement à l'utilisateur via le club (ton pivot)
+        // Note : Utilise bien ClubUserRole si c'est ton nouveau modèle
+        $clubUser = \App\Models\ClubUserRole::where('user_id', auth()->id())->first();
+
+        if ($clubUser) {
+            $category->owners()->attach($clubUser->id);
+        }
+
+        // 3. On retourne la catégorie pour que le JS puisse l'ajouter à la liste
+        return response()->json([
+            'category' => $category,
+            'message' => 'Catégorie ajoutée avec succès !'
+        ]);
+    }
+
     public function update(Request $request, Category $category)
     {
         $validated = $request->validate([

@@ -42,6 +42,8 @@ const adminNavigation = [
         children: [
             { name: 'Liste des collections', href: route('collections.listeCollec'), icon: List, active: 'collections.listeCollec' },
             { name: 'Nouvelle collection', href: route('collections.createCollec'), icon: Plus, active: 'collections.createCollec' },
+            { name: 'Liste des catégories', href: route('categories.index'), icon: List, active: 'categories.index' },
+
         ]
     },
 

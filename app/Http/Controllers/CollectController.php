@@ -23,20 +23,28 @@ class CollectController extends Controller
         $user = auth()->user();
         $userId = $user?->id;
 
-        // On simplifie la récupération des catégories pour éviter l'erreur sur "owners"
-        // Si tu as créé la table pivot category_club_user, garde le whereHas. Sinon, prends tout.
         $myCategories = Category::orderBy('name')->get();
 
-        // On charge club_user_role au lieu de club_user
-        $query = Collection::with(['club', 'club_user_role.user', 'categories']);
+        // 1. On commence par une requête simple
+        $query = Collection::query();
 
+        // 2. On charge les relations en "Eager Loading" (LEFT JOIN automatique de Laravel)
+        // On retire club_user_role.user du with principal si c'est lui qui bloque
+        $query->with(['club', 'categories']);
+
+        // 3. Filtrage par catégorie (si demandé)
         if ($request->filled('category')) {
             $query->whereHas('categories', fn($q) => $q->where('categories.id', $request->category));
         }
 
+        // 4. On récupère les collections
         $collections = $query->latest()->get()->map(function ($collection) use ($user) {
-            // Utilisation de la Policy
+            // On charge la relation utilisateur manuellement ici pour éviter de casser la requête principale
+            $collection->load('club_user_role.user');
+
+            // Correction de la Policy : on passe false si pas d'user
             $collection->can_edit = $user ? $user->can('update', $collection) : false;
+
             return $collection;
         });
 
@@ -62,6 +70,22 @@ class CollectController extends Controller
             'userId' => $user->id,
             'isUser' => true,
             'isClubManager' => (bool) $user->is_admin, // Correction ici
+        ]);
+    }
+
+    public function storeQuick(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:255|unique:categories,name']);
+
+        $category = Category::create([
+            'name' => $request->name,
+            'slug' => \Illuminate\Support\Str::slug($request->name),
+            'is_active' => true
+        ]);
+
+        return response()->json([
+            'category' => $category,
+            'message' => 'Catégorie ajoutée !'
         ]);
     }
 

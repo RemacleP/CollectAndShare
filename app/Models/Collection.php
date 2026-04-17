@@ -23,7 +23,7 @@ class Collection extends Model
 
     public function categories()
     {
-        return $this->belongsToMany(Category::class, 'category_collections');
+        return $this->belongsToMany(Category::class, 'category_collection');
     }
 
     public function club_user_role()

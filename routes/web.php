@@ -6,6 +6,7 @@ use App\Http\Controllers\ClubController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\CollectController;
+use App\Http\Controllers\CategoryController;
 use App\Models\Club;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -14,7 +15,7 @@ use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
-| 1. ROUTES PUBLIQUES (Accessibles à tous, même non-connectés)
+| 1. ROUTES PUBLIQUES
 |--------------------------------------------------------------------------
 */
 
@@ -30,28 +31,30 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-// Consultation (Lecture seule pour le public)
+Route::get('/home', fn() => redirect('/'))->name('home');
+
+// Consultation publique (Événements, Clubs, Infos)
 Route::get('/events', [EventController::class, 'index'])->name('events.index');
 Route::get('/events/{event:slug}', [EventController::class, 'show'])->name('events.show');
 Route::get('/clubs', [ClubController::class, 'index'])->name('clubs.index');
 Route::get('/clubs/{club:slug}', [ClubController::class, 'show'])->name('clubs.show');
-
-// Pages Légales (Consultation)
 Route::get('/mentions-legales', [LegalController::class, 'showLegal'])->name('legals.mentionsLegales');
 Route::get('/contact', [LegalController::class, 'showContact'])->name('legals.contacts');
 Route::get('/liens-utiles', [LegalController::class, 'showLiens'])->name('liensUtiles.index');
 
-Route::get('/home', fn() => redirect('/'))->name('home');
+// --- NOUVEAU : Accès public aux collections ---
+Route::get('/collections', [CollectController::class, 'listeCollec'])->name('collections.listeCollec');
+Route::get('/collections/{currentCollect:slug}/elements', [CollectController::class, 'listeElem'])->name('elements.listeElem');
 
 /*
 |--------------------------------------------------------------------------
-| 2. ZONE MEMBRES (Utilisateurs authentifiés et vérifiés)
+| 2. ZONE MEMBRES (Auth & Verified)
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // Dashboard principal
+    // Dashboard
     Route::get('/dashboard', function () {
         $user = auth()->user()->load(['address', 'clubs']);
         return Inertia::render('Dashboard', [
@@ -60,44 +63,60 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('dashboard');
 
-    // Inscriptions aux événements
-    Route::post('/events/{event:slug}/join', [EventController::class, 'join'])->name('events.join');
-    Route::delete('/events/{event:slug}/leave', [EventController::class, 'leave'])->name('events.leave');
-
-    // Gestion de l'identité (e-ID) et du profil
-    Route::post('/identity/verify', [IdentityController::class, 'verify'])->name('identity.verify');
-    Route::post('/identity/upload', [IdentityController::class, 'upload'])->name('identity.upload');
+    // Profil & Identité
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/identity/verify', [IdentityController::class, 'verify'])->name('identity.verify');
+    Route::post('/identity/upload', [IdentityController::class, 'upload'])->name('identity.upload');
+
+    // Événements (Participer)
+    Route::post('/events/{event:slug}/join', [EventController::class, 'join'])->name('events.join');
+    Route::delete('/events/{event:slug}/leave', [EventController::class, 'leave'])->name('events.leave');
+
+    /* --- GESTION PRIVÉE DES COLLECTIONS & ÉLÉMENTS --- */
+    Route::prefix('collections')->group(function () {
+        // Actions de création / modification
+        Route::get('/create', [CollectController::class, 'createCollec'])->name('collections.createCollec');
+        Route::post('/', [CollectController::class, 'storeCollec'])->name('collections.storeCollec');
+        Route::get('/{currentCollect}/edit', [CollectController::class, 'editCollec'])->name('collections.editCollec');
+        Route::post('/{currentCollect}', [CollectController::class, 'updateCollec'])->name('collections.updateCollec');
+        Route::delete('/{currentCollect}', [CollectController::class, 'deleteCollec'])->name('collections.deleteCollec');
+
+        // Actions sur les éléments
+        Route::get('/{currentCollect}/elements/create', [CollectController::class, 'createElem'])->name('elements.createElem');
+        Route::post('/{currentCollect}/elements', [CollectController::class, 'storeElem'])->name('elements.storeElem');
+        Route::get('/{currentCollect}/elements/{currentElem}/edit', [CollectController::class, 'editElem'])->name('elements.editElem');
+        Route::post('/{currentCollect}/elements/{currentElem}', [CollectController::class, 'updateElem'])->name('elements.updateElem');
+        Route::delete('/{currentCollect}/elements/{currentElem}', [CollectController::class, 'deleteElem'])->name('elements.deleteElem');
+    });
 });
 
 /*
 |--------------------------------------------------------------------------
-| 3. ZONE STAFF (Admins et Club Managers)
+| 3. ZONE STAFF & ADMIN (Auth)
 |--------------------------------------------------------------------------
-| Actions de modification, création et suppression
 */
 
 Route::middleware(['auth'])->group(function () {
 
-    // CRUD Événements (On exclut index/show car ils sont publics plus haut)
-    Route::resource('events', EventController::class)
-        ->except(['index', 'show'])
-        ->parameters(['events' => 'event:slug']);
+    // Gestion des Catégories
+    Route::prefix('categories')->group(function () {
+        Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
+        Route::post('/', [CategoryController::class, 'store'])->name('categories.store');
+        Route::post('/quick', [CategoryController::class, 'storeQuick'])->name('categories.storeQuick');
+        Route::put('/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    });
 
+    // CRUD Clubs & Events (Admin)
+    Route::resource('events', EventController::class)->except(['index', 'show'])->parameters(['events' => 'event:slug']);
+    Route::resource('clubs', ClubController::class)->except(['index', 'show'])->parameters(['clubs' => 'club:slug']);
 
-
-    // CRUD Clubs (Idem)
-    Route::resource('clubs', ClubController::class)
-        ->except(['index', 'show'])
-        ->parameters(['clubs' => 'club:slug']);
-
-    // Administration Légale
+    // Administration Légale & Liens
     Route::match(['post', 'put'], '/mentions-legales', [LegalController::class, 'updateLegal'])->name('legals.update');
     Route::post('/mentions-legales/restore', [LegalController::class, 'restoreLegal'])->name('legals.restore');
 
-    // Liens Utiles (Gestion)
     Route::prefix('liens-utiles')->group(function () {
         Route::get('/create', [LegalController::class, 'createLiens'])->name('liensUtiles.create');
         Route::post('/', [LegalController::class, 'storeLiens'])->name('liensUtiles.store');
@@ -107,41 +126,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| 4. GESTION DES COLLECTIONS ET ÉLÉMENTS
-|--------------------------------------------------------------------------
-*/
-
-// --- Consultation Publique (ou Membres seulement selon ton choix) ---
-// Si tu veux que ce soit public, mets-le hors du middleware auth
-Route::get('/collections', [CollectController::class, 'listeCollec'])->name('collections.listeCollec');
-Route::get('/collections/{currentCollect}/elements', [CollectController::class, 'listeElem'])->name('elements.listeElem');
-
-Route::middleware(['auth', 'verified'])->group(function () {
-
-    // --- Actions sur les Collections ---
-    Route::prefix('collections')->group(function () {
-        Route::get('/create', [CollectController::class, 'createCollec'])->name('collections.createCollec');
-        Route::post('/', [CollectController::class, 'storeCollec'])->name('collections.storeCollec');
-        Route::get('/{currentCollect}/edit', [CollectController::class, 'editCollec'])->name('collections.editCollec');
-        Route::post('/{currentCollect}', [CollectController::class, 'updateCollec'])->name('collections.updateCollec'); // POST car gestion d'image
-        Route::delete('/{currentCollect}', [CollectController::class, 'deleteCollec'])->name('collections.deleteCollec');
-    });
-
-    // --- Actions sur les Éléments (liés à une collection) ---
-    Route::prefix('collections/{currentCollect}/elements')->group(function () {
-        Route::get('/create', [CollectController::class, 'createElem'])->name('elements.createElem');
-        Route::post('/', [CollectController::class, 'storeElem'])->name('elements.storeElem');
-        Route::get('/{currentElem}/edit', [CollectController::class, 'editElem'])->name('elements.editElem');
-        Route::post('/{currentElem}', [CollectController::class, 'updateElem'])->name('elements.updateElem'); // POST pour les images
-        Route::delete('/{currentElem}', [CollectController::class, 'deleteElem'])->name('elements.deleteElem');
-    });
-});
-
-/*
-|--------------------------------------------------------------------------
-| AUTHENTIFICATION DE BASE (Breeze)
-|--------------------------------------------------------------------------
-*/
 require __DIR__.'/auth.php';
