@@ -218,7 +218,7 @@ class CollectController extends Controller
     {
         $this->authorize('update', $collection);
         $data = $request->validated();
-
+        //dd($data);
         $data['slug'] = Str::slug($data['label']) . '-' . uniqid();
         $element = $collection->elements()->create($data);
 

@@ -56,4 +56,10 @@ class Club extends Model
     {
         return 'slug';
     }
+
+    public function socialLinks()
+    {
+        // MorphMany permet de lier plusieurs lignes de social_links à ce club
+        return $this->morphMany(SocialLink::class, 'linkable');
+    }
 }

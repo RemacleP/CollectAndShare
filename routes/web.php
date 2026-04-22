@@ -138,30 +138,29 @@ Route::prefix('events')->name('events.')->group(function () {
 | 5. COLLECTIONS & ÉLÉMENTS
 |--------------------------------------------------------------------------
 */
+// 1. Collections elles-mêmes
 Route::prefix('collections')->name('collections.')->group(function () {
     Route::get('/', [CollectController::class, 'listeCollec'])->name('listeCollec');
 
     Route::middleware('auth')->group(function () {
         Route::get('/create', [CollectController::class, 'createCollec'])->name('createCollec');
         Route::post('/', [CollectController::class, 'storeCollec'])->name('storeCollec');
-
-        Route::prefix('{collection:slug}')->group(function () {
-            Route::get('/edit', [CollectController::class, 'editCollec'])->name('editCollec');
-            Route::patch('/', [CollectController::class, 'updateCollec'])->name('updateCollec');
-            Route::delete('/', [CollectController::class, 'deleteCollec'])->name('deleteCollec');
-
-            // Sous-ressources Éléments
-            Route::get('/elements/create', [CollectController::class, 'createElem'])->name('elements.createElem');
-            Route::post('/elements', [CollectController::class, 'storeElem'])->name('elements.storeElem');
-            Route::get('/elements', [CollectController::class, 'listeElem'])->name('elements.listeElem');
-            Route::get('/elements/{element:slug}', [CollectController::class, 'showElem'])->name('elements.show');
-            Route::get('/elements/{element:slug}/edit', [CollectController::class, 'editElem'])->name('elements.editElem');
-            Route::post('/elements/{element:slug}', [CollectController::class, 'updateElem'])->name('elements.updateElem');
-            Route::delete('/elements/{element:slug}', [CollectController::class, 'deleteElem'])->name('elements.deleteElem');
-        });
+        Route::get('/{collection:slug}/edit', [CollectController::class, 'editCollec'])->name('editCollec');
+        Route::patch('/{collection:slug}', [CollectController::class, 'updateCollec'])->name('updateCollec');
+        Route::delete('/{collection:slug}', [CollectController::class, 'deleteCollec'])->name('deleteCollec');
     });
 });
 
+// 2. Eléments
+Route::middleware(['auth'])->prefix('collections/{collection:slug}/elements')->name('elements.')->group(function () {
+    Route::get('/', [CollectController::class, 'listeElem'])->name('listeElem'); // Devient elements.listeElem
+    Route::get('/create', [CollectController::class, 'createElem'])->name('createElem');
+    Route::post('/', [CollectController::class, 'storeElem'])->name('storeElem');
+    Route::get('/{element:slug}', [CollectController::class, 'showElem'])->name('show');
+    Route::get('/{element:slug}/edit', [CollectController::class, 'editElem'])->name('editElem');
+    Route::post('/{element:slug}', [CollectController::class, 'updateElem'])->name('updateElem');
+    Route::delete('/{element:slug}', [CollectController::class, 'deleteElem'])->name('deleteElem');
+});
 /*
 |--------------------------------------------------------------------------
 | 6. CATÉGORIES

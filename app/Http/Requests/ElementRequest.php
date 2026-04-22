@@ -31,7 +31,8 @@ class ElementRequest extends FormRequest
             'price'=> 'required|numeric|min:0',
             'quantity'=> 'required|integer|min:0',
             'slug'=> 'nullable',
-            'image' => 'nullable|image|max:2048',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|image|max:2048',
             'delete_image' => ['nullable', 'boolean'],
         ];
     }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/layouts/AuthenticatedLayout.vue';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { ref, computed } from "vue";
-import { Button } from "@/components/ui/button";
-import FileUploader from "@/components/upload/FileUploader.vue";
+import { Button } from "@/Components/ui/button";
+import FileUploader from "@/Components/upload/FileUploader.vue";
 import { ArrowLeft, Save, Package, Tag, History, Calendar, Info } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -23,18 +23,25 @@ const form = useForm({
     price: 0,
     quantity: 1,
     collection_id: props.collect.id,
-    image: null as File | null,
+    images: [] as File[],
 });
 
 // Gestion de l'image via le composant FileUploader
 const handleFile = (file: File) => {
-    form.image = file;
+    form.images = [file]; // On place le fichier dans un tableau
 };
 
 const submit = () => {
     form.post(route('elements.storeElem', props.collect.slug), {
         forceFormData: true,
         preserveScroll: true,
+        onSuccess: () => {
+            console.log("Success!");
+        },
+        onError: (errors) => {
+            // C'EST ICI QUE TU VERRAS LE PROBLÈME
+            console.log("Détails des erreurs de validation:", errors);
+        },
     });
 };
 
@@ -75,7 +82,7 @@ const conditions = [
                         <Package class="h-4 w-4" /> Illustration de l'objet
                     </label>
                     <FileUploader @file-selected="handleFile" />
-                    <div v-if="form.errors.image" class="text-red-500 text-xs mt-2 font-bold">{{ form.errors.image }}</div>
+                    <div v-if="form.errors.images" class="text-red-500 text-xs mt-2 font-bold">{{ form.errors.images }}</div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -4,18 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Club;
 use App\Models\Role;
+use App\Models\SocialPlatform;
 use App\Http\Resources\ClubResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Illuminate\Support\Str;
 
 class ClubController extends Controller
 {
     /**
-     * Liste des clubs avec recherche et pagination.
+     * Liste des clubs.
      */
     public function index(Request $request)
     {
@@ -34,23 +35,24 @@ class ClubController extends Controller
     }
 
     /**
-     * Formulaire de création d'un club.
+     * Formulaire de création.
      */
     public function create()
     {
-        return Inertia::render('Clubs/Create');
+        return Inertia::render('Clubs/Create', [
+            'social_platforms' => SocialPlatform::where('is_active', true)->get()
+        ]);
     }
 
     /**
-     * Détails d'un club (Page Show).
+     * Détails d'un club.
      */
     public function show(string $slug)
     {
-        // On ajoute 'events' à la liste des relations chargées
         $club = Club::where('slug', $slug)
-            ->with(['address', 'users.roles','conversations', 'events' => function($query) {
-                $query->where('status', 'validated') // Optionnel : ne montrer que les validés
-                ->orderBy('start_datetime', 'asc');
+            ->with(['address', 'users.roles', 'conversations', 'socialLinks.platform', 'events' => function($query) {
+                $query->where('status', 'validated')
+                    ->orderBy('start_datetime', 'asc');
             }])
             ->withCount('users')
             ->firstOrFail();
@@ -69,33 +71,29 @@ class ClubController extends Controller
                 'address' => $club->address,
                 'members_count' => $club->users_count,
 
-                // On mappe les événements pour le composant Vue
+                // Formatage des liens sociaux
+                'socials' => $club->socialLinks->map(fn($link) => [
+                    'name' => $link->platform->name,
+                    'icon' => $link->platform->icon,
+                    'url' => $link->platform->base_url . $link->identifier,
+                ]),
+
                 'events' => $club->events->map(fn($e) => [
-                    'id' => $e->id,
-                    'title' => $e->title,
-                    'slug' => $e->slug,
-                    'start_datetime' => $e->start_datetime,
-                    'end_datetime' => $e->end_datetime,
-                    'city' => $e->city,
-                    'location_name' => $e->location_name,
+                    'id' => $e->id, 'title' => $e->title, 'slug' => $e->slug,
+                    'start_datetime' => $e->start_datetime, 'end_datetime' => $e->end_datetime,
+                    'city' => $e->city, 'location_name' => $e->location_name,
                     'image' => $e->image ? asset('storage/' . $e->image) : null,
                 ]),
 
                 'members' => $club->users->map(fn($u) => [
                     'id' => $u->id,
-                    'firstname' => $u->firstname,
-                    'lastname' => $u->lastname,
                     'full_name' => "{$u->firstname} {$u->lastname}",
                     'username' => $u->username,
-                    'is_super_admin' => (bool) $u->is_admin,
                     'club_role' => $u->roles->firstWhere('id', $u->pivot->role_id)?->label ?? 'Membre',
                 ]),
                 'conversations' => $club->conversations->map(fn($c) => [
-                    'id' => $c->id,
-                    'title' => $c->title,
-                    'slug' => $c->slug,
+                    'id' => $c->id, 'title' => $c->title, 'slug' => $c->slug,
                 ]),
-
             ],
             'can' => [
                 'edit' => $authUser ? (
@@ -122,36 +120,44 @@ class ClubController extends Controller
             'postal_code' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'country' => 'required|string|max:255',
+            'social_links' => 'nullable|array', // Changement : attend un tableau d'objets
+            'social_links.*.platform_id' => 'required|exists:social_platforms,id',
+            'social_links.*.identifier' => 'nullable|string|max:255',
         ]);
 
         return DB::transaction(function () use ($request, $validated) {
             $logoPath = $request->file('logo') ? $request->file('logo')->store('clubs/logos', 'public') : null;
-
+            //Génération des slug + préfixe aléatoires 10
+            $slug = Str::slug($validated['name']) . '-' . strtolower(Str::random(10));
             $club = Club::create([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
+                'slug' => $slug,
                 'email' => $validated['email'],
                 'phone' => $validated['phone'],
                 'logo' => $logoPath,
             ]);
 
-            $club->address()->create([
-                'street' => $validated['street'],
-                'number' => $validated['number'],
-                'box' => $validated['box'],
-                'postal_code' => $validated['postal_code'],
-                'city' => $validated['city'],
-                'country' => $validated['country'],
-            ]);
+            $club->address()->create($request->only(['street', 'number', 'box', 'postal_code', 'city', 'country']));
 
-            // Le créateur devient "Président" (ID 2 dans ta table roles)
+            // Gestion des réseaux sociaux (Multi-liens)
+            if (!empty($validated['social_links'])) {
+                foreach ($validated['social_links'] as $link) {
+                    if (!empty($link['identifier'])) {
+                        $club->socialLinks()->create([
+                            'social_platform_id' => $link['platform_id'],
+                            'identifier' => $link['identifier']
+                        ]);
+                    }
+                }
+            }
+
             $presidentRole = Role::where('name', 'president')->first();
             if ($presidentRole) {
                 $club->users()->attach(Auth::id(), ['role_id' => $presidentRole->id]);
             }
 
-            return redirect()->route('clubs.show', $club->slug)
-                ->with('success', 'Le club a été créé avec succès !');
+            return redirect()->route('clubs.show', $club->slug)->with('success', 'Club créé !');
         });
     }
 
@@ -160,16 +166,14 @@ class ClubController extends Controller
      */
     public function edit(Club $club)
     {
-        // Vérifie si l'utilisateur a le droit (via Policy ou manuellement)
         $user = Auth::user();
-        $hasAccess = $user->is_admin || $user->roles()->where('club_id', $club->slug)->where('name', 'president')->exists();
-
-        if (!$hasAccess) {
+        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'president')->exists()) {
             abort(403);
         }
 
         return Inertia::render('Clubs/Edit', [
-            'club' => $club->load('address')
+            'club' => $club->load(['address', 'socialLinks']),
+            'social_platforms' => SocialPlatform::where('is_active', true)->get()
         ]);
     }
 
@@ -179,9 +183,7 @@ class ClubController extends Controller
     public function update(Request $request, Club $club)
     {
         $user = Auth::user();
-        $hasAccess = $user->is_admin || $user->roles()->where('club_id', $club->id)->where('name', 'president')->exists();
-
-        if (!$hasAccess) {
+        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'president')->exists()) {
             abort(403);
         }
 
@@ -197,13 +199,14 @@ class ClubController extends Controller
             'postal_code' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'country' => 'required|string|max:255',
+            'social_links' => 'nullable|array',
+            'social_links.*.platform_id' => 'required|exists:social_platforms,id',
+            'social_links.*.identifier' => 'nullable|string|max:255',
         ]);
 
         DB::transaction(function () use ($request, $validated, $club) {
             if ($request->hasFile('logo')) {
-                if ($club->logo) {
-                    Storage::disk('public')->delete($club->logo);
-                }
+                if ($club->logo) Storage::disk('public')->delete($club->logo);
                 $club->logo = $request->file('logo')->store('clubs/logos', 'public');
             }
 
@@ -212,36 +215,42 @@ class ClubController extends Controller
                 'description' => $validated['description'],
                 'email' => $validated['email'],
                 'phone' => $validated['phone'],
+                'logo' => $club->logo,
             ]);
 
             $club->address()->updateOrCreate(
                 ['addressable_id' => $club->id, 'addressable_type' => Club::class],
-                [
-                    'street' => $validated['street'],
-                    'number' => $validated['number'],
-                    'box' => $validated['box'],
-                    'postal_code' => $validated['postal_code'],
-                    'city' => $validated['city'],
-                    'country' => $validated['country'],
-                ]
+                $request->only(['street', 'number', 'box', 'postal_code', 'city', 'country'])
             );
+
+            // LOGIQUE DE SYNCHRONISATION MULTI-LIENS
+            // On supprime les anciens liens et on réinsère le nouveau tableau
+            $club->socialLinks()->delete();
+
+            if (!empty($validated['social_links'])) {
+                foreach ($validated['social_links'] as $link) {
+                    if (!empty($link['identifier'])) {
+                        $club->socialLinks()->create([
+                            'social_platform_id' => $link['platform_id'],
+                            'identifier' => $link['identifier']
+                        ]);
+                    }
+                }
+            }
         });
 
-        return redirect()->route('clubs.show', $club->slug)
-            ->with('success', 'Le club a été mis à jour avec succès !');
+        return redirect()->route('clubs.show', $club->slug)->with('success', 'Club mis à jour !');
     }
 
+    /**
+     * API pour liste simple.
+     */
     public function apiIndex()
     {
         $clubs = Club::with('users.roles')->get()->map(function($club) {
-
-            // On cherche si un membre a le rôle 'responsable'
-            $hasManager = $club->users->contains(function($user) {
-                return $user->roles->contains(function($role) {
-                    // Utilisation de mb_strtolower pour être sûr de matcher 'responsable' ou 'Responsable'
-                    return mb_strtolower(trim($role->name)) === 'responsable';
-                });
-            });
+            $hasManager = $club->users->contains(fn($user) =>
+            $user->roles->contains(fn($role) => mb_strtolower(trim($role->name)) === 'responsable')
+            );
 
             return [
                 'id' => $club->id,

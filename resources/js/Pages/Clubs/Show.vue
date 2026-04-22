@@ -2,13 +2,16 @@
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+// Import des icônes de base + Globe pour le fallback + Tout le dictionnaire pour le dynamisme
+import * as LucideIcons from 'lucide-vue-next';
 import {
     ChevronLeft,
     MessageSquare,
     Calendar,
     Clock,
     MapPin,
-    ArrowRight
+    ArrowRight,
+    Globe
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -20,15 +23,19 @@ const page = usePage();
 const authUser = computed(() => page.props.auth.user);
 
 /**
- * LOGIQUE DE SÉCURITÉ BOUTON CHAT
- * On vérifie si l'utilisateur connecté est dans la liste des membres du club
+ * RÉCUPÉRATION DYNAMIQUE DES ICÔNES
+ * Cherche l'icône dans la bibliothèque par son nom (ex: "Music2")
+ * Si elle n'existe pas ou n'est pas définie, renvoie l'icône Globe.
  */
+const getSocialIcon = (iconName) => {
+    return LucideIcons[iconName] || Globe;
+};
+
 const isClubMember = computed(() => {
     return props.club.members?.some(member => member.id === authUser.value.id);
 });
 
 const defaultChatSlug = computed(() => {
-    // On prend la première conversation du club (souvent "Général")
     return props.club.conversations?.[0]?.slug || null;
 });
 
@@ -40,7 +47,6 @@ const goBack = () => {
     }
 };
 
-// Formateurs pour les cartes d'événements
 const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('fr-FR', {
         day: 'numeric', month: 'short'
@@ -52,7 +58,6 @@ const formatTime = (dateStr) => {
         hour: '2-digit', minute: '2-digit'
     });
 };
-
 </script>
 
 <template>
@@ -157,6 +162,25 @@ const formatTime = (dateStr) => {
                                     <div>
                                         <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Communauté</p>
                                         <p class="text-gray-900 font-semibold">{{ club.members_count }} membres inscrits</p>
+                                    </div>
+
+                                    <div v-if="club.socials && club.socials.length > 0" class="pt-4 border-t border-gray-200">
+                                        <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-3">Suivez-nous</p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <a
+                                                v-for="social in club.socials"
+                                                :key="social.name"
+                                                :href="social.url"
+                                                target="_blank"
+                                                class="group flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-zinc-200 text-zinc-500 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-sm transition-all active:scale-90"
+                                                :title="social.name"
+                                            >
+                                                <component
+                                                    :is="getSocialIcon(social.icon)"
+                                                    class="w-4 h-4 transition-transform group-hover:scale-110"
+                                                />
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
 

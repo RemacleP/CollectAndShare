@@ -3,9 +3,10 @@ import { ref, computed, onMounted } from 'vue';
 import { usePage, Link } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import Footer from '@/Components/Footer.vue';
+import FlashMessage from '@/Components/FlashMessage.vue';
 import {
     LayoutDashboard, ShieldCheck, FileText, ExternalLink,
-    Users, Settings, ChevronDown, Plus, List, ArrowRight,
+    Users, Settings, ChevronDown, Plus,Check , List, ArrowRight,
     Calendar, Palette, Image as ImageIcon
 } from 'lucide-vue-next';
 import {route} from "ziggy-js";
@@ -194,12 +195,14 @@ onMounted(() => {
 
                 <main class="p-8 flex-1 overflow-y-auto">
                     <div class="max-w-7xl mx-auto">
-                        <div v-if="$page.props.flash?.success" class="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg font-bold text-sm animate-bounce-short">
-                            ✅ {{ $page.props.flash.success }}
-                        </div>
+<!--               //Affichage des flash message
+                    <div v-if="$page.props.flash?.success" class="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg font-bold text-sm animate-bounce-short">
+                           <Check/> {{ $page.props.flash.success }}
+                    </div>&ndash;&gt;-->
                         <slot />
                     </div>
                 </main>
+                <FlashMessage />
             </div>
         </div>
         <Footer />
