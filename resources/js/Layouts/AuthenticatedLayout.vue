@@ -46,7 +46,7 @@ watch(() => page.props.auth.user?.theme, (newTheme) => {
 const sidebarVisible = ref(true);
 
 const openMenus = ref({
-    clubs: route().current('clubs.*'),
+    clubs: route().current('admin.clubs.*') || route().current('clubs.*'),
     liens: route().current('liensUtiles.*'),
     legals: route().current('legals.*'),
     collections: route().current('collections.*'),
@@ -92,8 +92,24 @@ const adminNavigation = [
         active: 'clubs.*',
         dropdown: 'clubs',
         children: [
-            { name: 'Liste des clubs', href: route('clubs.index'), icon: List, active: 'clubs.index' },
-            { name: 'Ajouter un club', href: route('clubs.create'), icon: Plus, active: 'clubs.create' },
+            {
+                name: 'Tableau de bord Clubs',
+                href: route('admin.clubs.index'),
+                icon: List,
+                active: 'admin.clubs.index'
+            },
+            {
+                name: 'Voir l\'annuaire',
+                href: route('clubs.index'),
+                icon: ExternalLink,
+                active: 'clubs.index'
+            },
+            {
+                name: 'Ajouter un club',
+                href: route('clubs.create'),
+                icon: Plus,
+                active: 'clubs.create'
+            },
         ]
     },
     {

@@ -3,7 +3,8 @@
 use App\Models\Collection;
 use App\Models\Element;
 use App\Models\User;
-use App\Http\Controllers\{InternalMailController,
+use App\Http\Controllers\{Admin\AdminClubController,
+    InternalMailController,
     ProfileController,
     IdentityController,
     ClubController,
@@ -110,6 +111,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::post('/settings/logo', [SettingController::class, 'updateLogo'])->name('settings.logo.update');
+
+
+        Route::get('/clubs', [AdminClubController::class, 'index'])->name('clubs.index');
+        Route::post('/clubs/{id}/restore', [AdminClubController::class, 'restore'])->name('clubs.restore');
+        Route::delete('/clubs/{id}/force', [AdminClubController::class, 'forceDelete'])->name('clubs.force-delete');
     });
 });
 
@@ -135,12 +141,16 @@ Route::prefix('clubs')->name('clubs.')->group(function () {
             // Chat de club
             Route::get('/chat/{conversation:slug}', [ConversationController::class, 'show'])
                 ->name('chat.show')
-                ->scopeBindings();;
+                ->scopeBindings();
             Route::post('/conversations', [ConversationController::class, 'store'])->name('chat.conversations.store');
         });
     });
 
+
+
     Route::get('/{club:slug}', [ClubController::class, 'show'])->name('show');
+
+
 });
 
 /*

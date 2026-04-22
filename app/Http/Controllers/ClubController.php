@@ -142,6 +142,13 @@ class ClubController extends Controller
 
             $club->address()->create($request->only(['street', 'number', 'box', 'postal_code', 'city', 'country']));
 
+            // CRÉATION DU CHAT PAR DÉFAUT
+            $club->conversations()->create([
+                'title' => 'Salon Principal',
+                'slug' => 'general-' . Str::random(10),
+                'is_private' => false, // Public pour tous les membres du club
+            ]);
+
             // Gestion des réseaux sociaux (Multi-liens)
             if (!empty($validated['social_links'])) {
                 foreach ($validated['social_links'] as $link) {
@@ -262,5 +269,28 @@ class ClubController extends Controller
         });
 
         return response()->json(['clubs' => $clubs]);
+    }
+
+    /**
+     * Suppression du club.
+     */
+    public function destroy(Club $club)
+    {
+        $user = Auth::user();
+
+        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'responsable')->exists()) {
+            abort(403);
+        }
+
+        // Sécurité : toujours pas de suppression si membres présents
+        if ($club->users()->count() > 1) {
+            return back()->with('error', "Ce club compte encore des membres.");
+        }
+
+        // Avec le SoftDelete, on ne supprime PAS physiquement le logo ni l'adresse
+        // pour pouvoir restaurer le club tel quel plus tard.
+        $club->delete();
+
+        return redirect()->route('clubs.index')->with('success', 'Le club a été archivé.');
     }
 }

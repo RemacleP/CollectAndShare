@@ -19,6 +19,8 @@ class ConversationController extends Controller
     public function show(Club $club, Conversation $conversation = null)
     {
         $user = auth()->user();
+        // 0. Le Super Admin a tous les droits
+        $isSuperAdmin = (bool) $user->is_admin;
 
         // 1. Vérifier les rôles au niveau du Club (Table: club_user_role)
         $isResponsable = $club->users()
@@ -27,7 +29,7 @@ class ConversationController extends Controller
                 $q->where('name', 'responsable');
             })->exists();
 
-        $isClubMember = $club->users()->where('users.id', $user->id)->exists();
+        $isClubMember = $isSuperAdmin ||$club->users()->where('users.id', $user->id)->exists();
 
         // 2. Filtrage des conversations (Menu de gauche)
         // Logique : Responsable voit tout / Membre voit public + ses privés / Externe voit UNIQUEMENT ses invitations
@@ -131,7 +133,10 @@ class ConversationController extends Controller
         // Le créateur devient modérateur par défaut
         $conversation->users()->attach(auth()->id(), ['role' => 'moderator']);
 
-        return redirect()->route('chat.show', [$club->slug, $conversation->slug]);
+        return redirect()->route('clubs.chat.show', [
+            'club' => $club->slug,
+            'conversation' => $conversation->slug
+        ]);
     }
 
     /**

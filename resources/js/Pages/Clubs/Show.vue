@@ -64,6 +64,16 @@ const formatTime = (dateStr) => {
         hour: '2-digit', minute: '2-digit'
     });
 };
+
+const canDelete = computed(() => props.club.members_count <= 1);
+
+const deleteClub = () => {
+    if (!canDelete.value) return;
+
+    if (confirm("Confirmer la suppression définitive ?")) {
+        router.delete(route('clubs.destroy', props.club.slug));
+    }
+};
 </script>
 
 <template>
@@ -127,7 +137,7 @@ const formatTime = (dateStr) => {
                                 </p>
                             </div>
 
-                            <div v-if="authUser && (isClubMember || can.edit)" class="pt-4">
+                            <div v-if="authUser && (isClubMember || can.edit) " class="pt-4">
                                 <Link
                                     v-if="defaultChatSlug"
                                     :href="route('clubs.chat.show', { club: club.slug, conversation: defaultChatSlug })"
@@ -201,6 +211,36 @@ const formatTime = (dateStr) => {
                                           class="flex justify-center items-center w-full bg-white border-2 border-indigo-600 text-indigo-600 px-4 py-2.5 rounded-xl hover:bg-indigo-50 transition font-black text-xs uppercase tracking-widest">
                                         ⚙️ Modifier le club
                                     </Link>
+                                </div>
+                                <div class="mt-12 pt-8 border-t border-zinc-100">
+                                    <h3 class="text-lg font-bold text-zinc-900 mb-2">Zone de danger</h3>
+
+                                    <div v-if="!canDelete" class="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                                        <div class="flex items-start gap-3">
+                                            <span class="text-lg shrink-0">⚠️</span>
+
+                                            <div class="text-sm text-amber-700 leading-relaxed">
+                                                Vous ne pouvez pas supprimer ce club car il compte encore
+                                                <strong>{{ club.members_count }} membres</strong>.
+                                                Veuillez retirer tous les membres avant de pouvoir procéder à la suppression.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        @click="deleteClub"
+                                        type="button"
+                                        :disabled="!canDelete"
+                                        :class="[
+                                            canDelete
+                                            ? 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border-red-100'
+                                            : 'bg-zinc-100 text-zinc-400 cursor-not-allowed border-zinc-200'
+                                        ]"
+                                        class="flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 border"
+                                    >
+                                        <Trash2 class="w-4 h-4" />
+                                        Supprimer le club
+                                    </button>
                                 </div>
                             </div>
                         </div>
