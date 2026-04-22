@@ -94,12 +94,14 @@ onUnmounted(() => clearInterval(interval));
                         <h2 class="font-bold uppercase tracking-wider text-sm text-gray-500">Clubs Populaires</h2>
                     </div>
                     <div class="space-y-3">
-                        <div v-for="club in topClubs" :key="club.id" class="group flex justify-between items-center p-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 rounded-xl transition duration-200 ease-in-out cursor-pointer">
+                        <Link v-for="club in topClubs" :key="club.id"
+                              :href="route('clubs.show', club.slug)"
+                              class="group flex justify-between items-center p-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 rounded-xl transition duration-200 ease-in-out cursor-pointer">
                             <span class="font-semibold text-gray-700 dark:text-gray-200 group-hover:text-indigo-600">{{ club.name }}</span>
                             <span class="text-xs font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full">
                                 {{ club.users_count }} membres
                             </span>
-                        </div>
+                        </Link>
                     </div>
                 </div>
 

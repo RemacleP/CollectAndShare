@@ -1,154 +1,167 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { useForm } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
-import AppLayout from '@/layouts/AppLayout.vue';
-import {computed, ref} from "vue";
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout.vue';
+import { ref, computed } from "vue";
+import { Button } from "@/components/ui/button";
 import FileUploader from "@/components/upload/FileUploader.vue";
-import {listeCollec} from "@/routes/collections";
+import { ArrowLeft, Save, Package, Tag, History, Calendar, Info } from 'lucide-vue-next';
 
 const props = defineProps<{
-    collect: { id: number, slug: string}
+    collect: {
+        id: number;
+        name: string;
+        slug: string;
+    }
 }>();
+
 const form = useForm({
     label: '',
     description: '',
-    year_production: 0,
+    year_production: new Date().getFullYear(),
     history: '',
     condition: '',
     price: 0,
-    quantity:0,
-    slug: '',
+    quantity: 1,
     collection_id: props.collect.id,
-    image: null,
+    image: null as File | null,
 });
 
-//Gestion image
-const image = ref<File | null>(null);
-function handleFile(file: File) {
-    image.value = file;
-}
-function submit() {
-    if (image.value) {
-        form.image = image.value;
-    }
+// Gestion de l'image via le composant FileUploader
+const handleFile = (file: File) => {
+    form.image = file;
+};
 
+const submit = () => {
     form.post(route('elements.storeElem', props.collect.slug), {
-        forceFormData: true
+        forceFormData: true,
+        preserveScroll: true,
     });
-}
+};
+
 const breadcrumbs = computed(() => [
-    { title: 'Accueil', href: route('home') },
-    {
-        title: props.collect.name
-            ? `Collection  : ${props.collect.name}`
-            : 'Collection :',
-        href: listeCollec().url
-    },
-    { title: 'Elements', href: route ('elements.listeElem',props.collect.slug) },
-    {
-        title: 'Créer un élément',
-    },
+    { title: 'Collections', href: route('collections.listeCollec') },
+    { title: props.collect.name, href: route('elements.listeElem', props.collect.slug) },
+    { title: 'Nouvel élément' },
 ]);
+
+const conditions = [
+    { value: 'new', label: 'Neuf' },
+    { value: 'used', label: 'Utilisé' },
+    { value: 'damaged', label: 'Endommagé' }
+];
 </script>
+
 <template>
-    <Head title="Welcome">
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-    </Head>
+    <Head :title="`Ajouter à ${collect.name}`" />
 
-    <AppLayout :breadcrumbs="breadcrumbs">
-    <div class="p-6">
-        <h1 class="mb-4 text-2xl font-bold">Créer un élément</h1>
-        <Link :href="route('elements.listeElem', props.collect.slug)">
-            <button class="rounded bg-blue-600 px-4 py-2 text-white">
-                Retour
-            </button>
-        </Link>
-        <form @submit.prevent="submit">
+    <AuthenticatedLayout :breadcrumbs="breadcrumbs">
+        <div class="max-w-4xl mx-auto p-6">
 
-            <div class="mb-3">
-                <label class="font-semibold">Image</label>
-                <FileUploader @file-selected="handleFile" />
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-black text-gray-900 dark:text-white">Ajouter un objet</h1>
+                    <p class="text-sm text-gray-500">Collection : <span class="text-indigo-600 font-bold">{{ collect.name }}</span></p>
+                </div>
+                <Link :href="route('elements.listeElem', collect.slug)">
+                    <Button variant="outline" class="rounded-xl">
+                        <ArrowLeft class="mr-2 h-4 w-4" /> Retour
+                    </Button>
+                </Link>
             </div>
 
-            <div class="mb-3">
-                <label class="font-semibold">Nom</label>
-                <input v-model="form.label" class="w-full rounded border p-2"
-                       required
-                />
-            </div>
+            <form @submit.prevent="submit" class="space-y-6">
+                <div class="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-gray-100 dark:border-zinc-800 shadow-sm">
+                    <label class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-400 mb-4">
+                        <Package class="h-4 w-4" /> Illustration de l'objet
+                    </label>
+                    <FileUploader @file-selected="handleFile" />
+                    <div v-if="form.errors.image" class="text-red-500 text-xs mt-2 font-bold">{{ form.errors.image }}</div>
+                </div>
 
-            <div class="mb-3">
-                <label class="font-semibold">Description</label>
-                <textarea
-                    v-model="form.description"
-                    class="w-full rounded border p-2"
-                    required
-                ></textarea>
-            </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-gray-100 dark:border-zinc-800 shadow-sm space-y-4">
+                        <label class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-400">
+                            <Tag class="h-4 w-4" /> Détails
+                        </label>
 
-            <div class="mb-3">
-                <label class="font-semibold">Année de production</label>
-                <input
-                    type="number"
-                    v-model.number="form.year_production"
-                    class="w-full rounded border p-2"
-                    required
-                />
-            </div>
+                        <div>
+                            <input
+                                v-model="form.label"
+                                placeholder="Nom de l'objet (ex: Pièce de 2€ commémorative)"
+                                class="w-full rounded-2xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-4 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                                required
+                            />
+                            <div v-if="form.errors.label" class="text-red-500 text-xs mt-1">{{ form.errors.label }}</div>
+                        </div>
 
-            <div class="mb-3">
-                <label class="font-semibold">Histoire</label>
-                <textarea
-                    v-model="form.history"
-                    class="w-full rounded border p-2"
-                ></textarea>
-            </div>
+                        <textarea
+                            v-model="form.description"
+                            placeholder="Description courte..."
+                            rows="4"
+                            class="w-full rounded-2xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-4 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                            required
+                        ></textarea>
+                    </div>
 
-            <div class="mb-3">
-                <label class="font-semibold">Condition</label>
-                <select
-                    v-model="form.condition"
-                    class="w-full rounded border p-2 "
-                    required
-                >
-                    <option class="text-gray-700" value="" disabled>Choisir une condition</option>
-                    <option class="text-gray-700" value="new">Neuf</option>
-                    <option class="text-gray-700" value="used">Utilisé</option>
-                    <option class="text-gray-700" value="damaged">Endommagé</option>
-                </select>
-            </div>
+                    <div class="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-gray-100 dark:border-zinc-800 shadow-sm space-y-4">
+                        <label class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-400">
+                            <Info class="h-4 w-4" /> Caractéristiques
+                        </label>
 
-            <div class="mb-3">
-                <label class="font-semibold">Prix (€)</label>
-                <input
-                    type="number"
-                    v-model.number="form.price"
-                    class="w-full rounded border p-2"
-                    required
-                />
-            </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Année</label>
+                                <input type="number" v-model="form.year_production" class="w-full rounded-xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-3 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">État</label>
+                                <select v-model="form.condition" class="w-full rounded-xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-3 focus:ring-indigo-500">
+                                    <option value="" disabled>Choisir...</option>
+                                    <option v-for="c in conditions" :key="c.value" :value="c.value">{{ c.label }}</option>
+                                </select>
+                            </div>
+                        </div>
 
-            <div class="mb-3">
-                <label class="font-semibold">Quantité</label>
-                <input
-                    type="number"
-                    v-model.number="form.quantity"
-                    class="w-full rounded border p-2"
-                    required
-                />
-            </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Prix estimé (€)</label>
+                                <input type="number" step="0.01" v-model="form.price" class="w-full rounded-xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-3 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase ml-2">Quantité</label>
+                                <input type="number" v-model="form.quantity" class="w-full rounded-xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-3 focus:ring-indigo-500" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            <button
-                type="submit"
-                class="rounded bg-green-600 px-4 py-2 text-white"
-            >
-                Créer l'élément
-            </button>
-        </form>
-    </div>
-    </AppLayout>
+                <div class="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-gray-100 dark:border-zinc-800 shadow-sm">
+                    <label class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-400 mb-4">
+                        <History class="h-4 w-4" /> Histoire / Provenance
+                    </label>
+                    <textarea
+                        v-model="form.history"
+                        placeholder="D'où vient cet objet ? Son parcours..."
+                        rows="3"
+                        class="w-full rounded-2xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-4 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                    ></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-4">
+                    <Link :href="route('elements.listeElem', collect.slug)" class="text-sm font-bold text-gray-400 hover:text-gray-600 transition">
+                        Annuler
+                    </Link>
+                    <Button
+                        type="button"
+                        @click="submit"
+                        :disabled="form.processing"
+                        class="rounded-2xl bg-indigo-600 px-10 py-7 font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 dark:shadow-none transition-all active:scale-95"
+                    >
+                        <Save class="mr-2 h-5 w-5" />
+                        {{ form.processing ? 'Enregistrement...' : "Sauvegarder l'objet" }}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    </AuthenticatedLayout>
 </template>
-
-

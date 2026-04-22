@@ -4,73 +4,49 @@ namespace App\Policies;
 
 use App\Models\Collection;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class CollectionPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * L'admin a tous les droits par défaut (Optionnel si défini dans AuthServiceProvider)
      */
-    public function viewAny(User $user): bool
+    public function before(User $user, $ability)
     {
-        return false;
+        if ($user->is_admin) {
+            return true;
+        }
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
-    public function view(User $user, Collection $collection): bool
+    public function viewAny(?User $user): bool
     {
-        return false;
+        return true; // Tout le monde peut voir la liste
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user): bool
+    public function view(?User $user, Collection $collection): bool
     {
-        return false;
+        return true; // Tout le monde peut voir une collection
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Collection $collection): bool
     {
-        // 1. Le Super-Admin peut tout faire
-        if ($user->is_admin) return true;
-
-        // 2. Le créateur de la collection est propriétaire
-        // On vérifie via la relation club_user qui lie l'user à la collection
-        if ($collection->club_user && $collection->club_user->user_id === $user->id) {
+        // 1. On vérifie si l'utilisateur est le propriétaire via club_user_role
+        // On utilise la relation chargée dans le contrôleur : club_user_role
+        if ($collection->club_user_role && $collection->club_user_role->user_id === $user->id) {
             return true;
         }
 
-        // 3. Le responsable/président du club auquel appartient la collection
-        return $user->hasRole('responsable', $collection->club_id);
+        // 2. Le responsable du club a aussi le droit (si ta méthode hasRole existe)
+        // Sinon : $user->clubs()->where('club_id', $collection->club_id)->where('role', 'responsable')->exists();
+        if (method_exists($user, 'hasRole')) {
+            return $user->hasRole('responsable', $collection->club_id);
+        }
+
+        return false;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Collection $collection): bool
     {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Collection $collection): bool
-    {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Collection $collection): bool
-    {
-        return false;
+        // Généralement, mêmes droits que pour l'update
+        return $this->update($user, $collection);
     }
 }

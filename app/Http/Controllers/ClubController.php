@@ -48,7 +48,7 @@ class ClubController extends Controller
     {
         // On ajoute 'events' à la liste des relations chargées
         $club = Club::where('slug', $slug)
-            ->with(['address', 'users.roles', 'events' => function($query) {
+            ->with(['address', 'users.roles','conversations', 'events' => function($query) {
                 $query->where('status', 'validated') // Optionnel : ne montrer que les validés
                 ->orderBy('start_datetime', 'asc');
             }])
@@ -90,11 +90,16 @@ class ClubController extends Controller
                     'is_super_admin' => (bool) $u->is_admin,
                     'club_role' => $u->roles->firstWhere('id', $u->pivot->role_id)?->label ?? 'Membre',
                 ]),
+                'conversations' => $club->conversations->map(fn($c) => [
+                    'id' => $c->id,
+                    'title' => $c->title,
+                    'slug' => $c->slug,
+                ]),
+
             ],
             'can' => [
                 'edit' => $authUser ? (
-                    $authUser->is_admin ||
-                    $authUser->roles()->where('club_id', $club->id)->where('name', 'responsable')->exists()
+                    $authUser->is_admin || $authUser->roles()->where('club_id', $club->id)->where('name', 'responsable')->exists()
                 ) : false,
             ]
         ]);
@@ -157,7 +162,7 @@ class ClubController extends Controller
     {
         // Vérifie si l'utilisateur a le droit (via Policy ou manuellement)
         $user = Auth::user();
-        $hasAccess = $user->is_admin || $user->roles()->where('club_id', $club->id)->where('name', 'president')->exists();
+        $hasAccess = $user->is_admin || $user->roles()->where('club_id', $club->slug)->where('name', 'president')->exists();
 
         if (!$hasAccess) {
             abort(403);
@@ -224,5 +229,27 @@ class ClubController extends Controller
 
         return redirect()->route('clubs.show', $club->slug)
             ->with('success', 'Le club a été mis à jour avec succès !');
+    }
+
+    public function apiIndex()
+    {
+        $clubs = Club::with('users.roles')->get()->map(function($club) {
+
+            // On cherche si un membre a le rôle 'responsable'
+            $hasManager = $club->users->contains(function($user) {
+                return $user->roles->contains(function($role) {
+                    // Utilisation de mb_strtolower pour être sûr de matcher 'responsable' ou 'Responsable'
+                    return mb_strtolower(trim($role->name)) === 'responsable';
+                });
+            });
+
+            return [
+                'id' => $club->id,
+                'name' => $club->name,
+                'has_manager' => $hasManager,
+            ];
+        });
+
+        return response()->json(['clubs' => $clubs]);
     }
 }

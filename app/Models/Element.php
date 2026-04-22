@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class Element extends Model
@@ -27,6 +28,12 @@ class Element extends Model
     public function collection()
     {
         return $this->belongsTo(Collection::class);
+    }
+
+// Optionnel mais pratique : une relation directe vers l'utilisateur
+    public function user()
+    {
+        return $this->collection->user(); // Si Collection a une relation user()
     }
 
     public function carts()
@@ -73,5 +80,10 @@ class Element extends Model
     public function getRouteKeyName()
     {
         return 'slug';
+    }
+
+    public function images()
+    {
+        return $this->hasMany(ElementImage::class);
     }
 }

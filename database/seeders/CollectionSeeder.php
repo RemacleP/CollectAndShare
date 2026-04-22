@@ -80,5 +80,9 @@ class CollectionSeeder extends Seeder
         }
 
         $this->command->info('Seed terminé ! Les colonnes club_user_id et club_id sont correctement remplies.');
+
+        $this->call([
+            CollectionSeeder::class,
+        ]);
     }
 }

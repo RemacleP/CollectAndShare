@@ -28,7 +28,7 @@ const form = useForm({
 
 const submit = () => {
     // On envoie en POST car il y a un fichier, le _method: 'put' fera le reste côté Laravel
-    form.post(route('clubs.update', props.club.id), {
+    form.post(route('clubs.update', props.club.slug), {
         forceFormData: true,
         preserveScroll: true,
     });

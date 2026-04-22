@@ -1,31 +1,35 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { usePage, Link } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import Footer from '@/Components/Footer.vue';
 import {
     LayoutDashboard, ShieldCheck, FileText, ExternalLink,
-    Users, Settings, ChevronDown, Plus, List, Circle, ArrowRight,
-    Calendar
+    Users, Settings, ChevronDown, Plus, List, ArrowRight,
+    Calendar, Palette, Image as ImageIcon
 } from 'lucide-vue-next';
+import {route} from "ziggy-js";
 
 const page = usePage();
 const isAdmin = computed(() => !!page.props.auth.user?.is_admin);
 
 // Gestion de l'ouverture des menus (Dropdowns)
-// S'ouvre automatiquement si on est sur une route parente
 const openMenus = ref({
     clubs: route().current('clubs.*'),
     liens: route().current('liensUtiles.*'),
     legals: route().current('legals.*'),
-    collections: route().current('collections.*')
+    collections: route().current('collections.*'),
+    users: route().current('admin.users.*'),
+    settings: route().current('admin.settings.*') // Ajout pour la configuration
 });
 
 const toggleMenu = (menu) => {
     openMenus.value[menu] = !openMenus.value[menu];
 };
 
-// Configuration des menus CRUD
+const sidebarVisible = ref(true);
+
+// Configuration des menus
 const adminNavigation = [
     {
         name: 'Dashboard',
@@ -33,20 +37,26 @@ const adminNavigation = [
         icon: LayoutDashboard,
         active: 'dashboard'
     },
-
     {
         name: 'Collections',
-        icon: List,//Ou Library ou Layers
+        icon: List,
         active: 'collections.*',
         dropdown: 'collections',
         children: [
             { name: 'Liste des collections', href: route('collections.listeCollec'), icon: List, active: 'collections.listeCollec' },
             { name: 'Nouvelle collection', href: route('collections.createCollec'), icon: Plus, active: 'collections.createCollec' },
             { name: 'Liste des catégories', href: route('categories.index'), icon: List, active: 'categories.index' },
-
         ]
     },
-
+    {
+        name: 'Utilisateurs',
+        icon: Users,
+        active: 'admin.users.*',
+        dropdown: 'users',
+        children: [
+            { name: 'Liste des membres', href: route('admin.users.index'), icon: List, active: 'admin.users.index' },
+        ]
+    },
     {
         name: 'Gestion Clubs',
         icon: ShieldCheck,
@@ -63,8 +73,8 @@ const adminNavigation = [
         active: 'events.*',
         dropdown: 'events',
         children: [
-            { name: 'Liste des événements', href: route('events.index'), icon: List },
-            { name: 'Créer un événement', href: route('events.create'), icon: Plus },
+            { name: 'Liste des événements', href: route('events.index'), icon: List, active: 'events.index' },
+            { name: 'Créer un événement', href: route('events.create'), icon: Plus, active: 'events.create' },
         ]
     },
     {
@@ -83,23 +93,32 @@ const adminNavigation = [
         active: 'legals.*',
         dropdown: 'legals',
         children: [
+            { name: 'Voir Mentions', href: route('legals.mentionsLegales'), icon: List, active: 'legals.mentionsLegales' },
+            { name: 'Modifier', href: route('legals.mentionsLegales', { edit: 'true' }), icon: Plus, active: null }
+        ]
+    },
+    // NOUVELLE SECTION : CONFIGURATION
+    {
+        name: 'Configuration',
+        icon: Settings,
+        active: 'admin.settings.*',
+        dropdown: 'settings',
+        children: [
             {
-                name: 'Voir Mentions',
-                href: route('legals.mentionsLegales'),
-                icon: List,
-                active: 'legals.mentionsLegales'
+                name: 'Identité Visuelle',
+                href: route('admin.settings.index'),
+                icon: ImageIcon,
+                active: 'admin.settings.index'
             },
-            {
-                name: 'Modifier',
-                // On pointe vers la même page, mais on pourrait ajouter un paramètre
-                // ou simplement laisser l'utilisateur cliquer sur "Modifier" dans la page
-                href: route('legals.mentionsLegales', { edit: 'true' }),
-                icon: Plus,
-                active: null
-            }
+            /* Tu pourras ajouter "Couleurs" ici plus tard */
         ]
     }
 ];
+
+onMounted(() => {
+    const storedSidebar = localStorage.getItem('showSidebar');
+    sidebarVisible.value = storedSidebar !== null ? JSON.parse(storedSidebar) : true;
+});
 </script>
 
 <template>
@@ -107,13 +126,13 @@ const adminNavigation = [
         <Navbar :user="$page.props.auth.user" />
 
         <div class="flex flex-1">
-            <aside v-if="isAdmin" class="w-72 bg-white dark:bg-zinc-900 border-r border-gray-200 dark:border-zinc-800 hidden md:flex flex-col sticky top-0 h-[calc(100vh-64px)] overflow-y-auto shadow-sm">
+            <aside v-if="isAdmin && sidebarVisible" class="w-72 bg-white dark:bg-zinc-900 border-r border-gray-200 dark:border-zinc-800 hidden md:flex flex-col sticky top-0 h-[calc(100vh-64px)] overflow-y-auto shadow-sm">
 
-                <div class="p-6">
-                    <div class="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-                        <Settings class="h-4 w-4 text-zinc-500" />
-                        <span class="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Administration</span>
-                    </div>
+                <div class="p-6 border-b border-gray-50 dark:border-zinc-800/50 mb-4">
+                    <Link :href="route('dashboard')" class="flex flex-col items-center group">
+
+                        <span class="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em]">Administration</span>
+                    </Link>
                 </div>
 
                 <nav class="flex-1 px-4 space-y-2 pb-10">
@@ -124,7 +143,7 @@ const adminNavigation = [
                                 route().current(item.active)
                                 ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-lg'
                                 : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800',
-                                'flex items-center px-4 py-3 text-sm font-bold rounded-2xl transition-all duration-200'
+                                'flex items-center px-4 py-3 text-sm font-bold rounded-2xl transition-all'
                             ]"
                         >
                             <component :is="item.icon" class="mr-3 h-5 w-5 shrink-0" />
@@ -178,24 +197,11 @@ const adminNavigation = [
                         <div v-if="$page.props.flash?.success" class="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg font-bold text-sm animate-bounce-short">
                             ✅ {{ $page.props.flash.success }}
                         </div>
-
                         <slot />
                     </div>
                 </main>
             </div>
         </div>
-
         <Footer />
     </div>
 </template>
-
-<style scoped>
-.animate-bounce-short {
-    animation: bounce 0.5s ease-in-out 1;
-}
-
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-}
-</style>

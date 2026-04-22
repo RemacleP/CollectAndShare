@@ -1,13 +1,21 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\IdentityController;
-use App\Http\Controllers\ClubController;
-use App\Http\Controllers\LegalController;
-use App\Http\Controllers\EventController;
-use App\Http\Controllers\CollectController;
-use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\{InternalMailController,
+    ProfileController,
+    IdentityController,
+    ClubController,
+    LegalController,
+    EventController,
+    CollectController,
+    CategoryController,
+    CartController,
+    PaymentController,
+    ConversationController,
+    AdminUserController};
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Admin\SettingController;
 use App\Models\Club;
+use App\Models\Order;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +23,9 @@ use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
-| 1. ROUTES PUBLIQUES
+| 1. GÉNÉRAL & ACCUEIL
 |--------------------------------------------------------------------------
 */
-
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin'       => Route::has('login'),
@@ -33,97 +40,198 @@ Route::get('/', function () {
 
 Route::get('/home', fn() => redirect('/'))->name('home');
 
-// Consultation publique (Événements, Clubs, Infos)
-Route::get('/events', [EventController::class, 'index'])->name('events.index');
-Route::get('/events/{event:slug}', [EventController::class, 'show'])->name('events.show');
-Route::get('/clubs', [ClubController::class, 'index'])->name('clubs.index');
-Route::get('/clubs/{club:slug}', [ClubController::class, 'show'])->name('clubs.show');
-Route::get('/mentions-legales', [LegalController::class, 'showLegal'])->name('legals.mentionsLegales');
-Route::get('/contact', [LegalController::class, 'showContact'])->name('legals.contacts');
-Route::get('/liens-utiles', [LegalController::class, 'showLiens'])->name('liensUtiles.index');
-
-// --- NOUVEAU : Accès public aux collections ---
-Route::get('/collections', [CollectController::class, 'listeCollec'])->name('collections.listeCollec');
-Route::get('/collections/{currentCollect:slug}/elements', [CollectController::class, 'listeElem'])->name('elements.listeElem');
-
+Route::post('/register-request', [RegisteredUserController::class, 'store'])
+    ->name('register.request');
 /*
 |--------------------------------------------------------------------------
-| 2. ZONE MEMBRES (Auth & Verified)
+| 2. MESSAGERIE & ADMINISTRATION (SYSTEME)
 |--------------------------------------------------------------------------
 */
-
 Route::middleware(['auth', 'verified'])->group(function () {
-
     // Dashboard
     Route::get('/dashboard', function () {
-        $user = auth()->user()->load(['address', 'clubs']);
         return Inertia::render('Dashboard', [
-            'user'   => $user,
+            'user'   => auth()->user()->load(['address', 'clubs']),
+            'orders' => Order::where('user_id', auth()->id())->with('items')->latest()->take(5)->get(),
             'status' => session('status'),
         ]);
     })->name('dashboard');
 
-    // Profil & Identité
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::post('/identity/verify', [IdentityController::class, 'verify'])->name('identity.verify');
-    Route::post('/identity/upload', [IdentityController::class, 'upload'])->name('identity.upload');
+    // Messagerie Interne
+    Route::get('/messages', [InternalMailController::class, 'index'])->name('messages.index');
+    Route::patch('/messages/{mail}/read', [InternalMailController::class, 'markAsRead'])->name('messages.read');
+    Route::post('/requests/{id}/approve', [RegisteredUserController::class, 'approve'])->name('requests.approve');
+    Route::post('/requests/{id}/reject', [RegisteredUserController::class, 'reject'])->name('requests.reject');
 
-    // Événements (Participer)
-    Route::post('/events/{event:slug}/join', [EventController::class, 'join'])->name('events.join');
-    Route::delete('/events/{event:slug}/leave', [EventController::class, 'leave'])->name('events.leave');
 
-    /* --- GESTION PRIVÉE DES COLLECTIONS & ÉLÉMENTS --- */
-    Route::prefix('collections')->group(function () {
-        // Actions de création / modification
-        Route::get('/create', [CollectController::class, 'createCollec'])->name('collections.createCollec');
-        Route::post('/', [CollectController::class, 'storeCollec'])->name('collections.storeCollec');
-        Route::get('/{currentCollect}/edit', [CollectController::class, 'editCollec'])->name('collections.editCollec');
-        Route::post('/{currentCollect}', [CollectController::class, 'updateCollec'])->name('collections.updateCollec');
-        Route::delete('/{currentCollect}', [CollectController::class, 'deleteCollec'])->name('collections.deleteCollec');
+    // Administration spécifique
+    Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/requests', function () {
+            return Inertia::render('admin/requests/index', ['requests' => []]);
+        })->name('requests.index');
 
-        // Actions sur les éléments
-        Route::get('/{currentCollect}/elements/create', [CollectController::class, 'createElem'])->name('elements.createElem');
-        Route::post('/{currentCollect}/elements', [CollectController::class, 'storeElem'])->name('elements.storeElem');
-        Route::get('/{currentCollect}/elements/{currentElem}/edit', [CollectController::class, 'editElem'])->name('elements.editElem');
-        Route::post('/{currentCollect}/elements/{currentElem}', [CollectController::class, 'updateElem'])->name('elements.updateElem');
-        Route::delete('/{currentCollect}/elements/{currentElem}', [CollectController::class, 'deleteElem'])->name('elements.deleteElem');
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::patch('/users/{user}/verify', [AdminUserController::class, 'verify'])->name('users.verify');
+        Route::patch('/users/{user}/ban', [AdminUserController::class, 'toggleBan'])->name('users.ban');
+
+        Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+        Route::post('/settings/logo', [SettingController::class, 'updateLogo'])->name('settings.logo.update');
     });
 });
 
 /*
 |--------------------------------------------------------------------------
-| 3. ZONE STAFF & ADMIN (Auth)
+| 3. CLUBS
 |--------------------------------------------------------------------------
 */
+Route::prefix('clubs')->name('clubs.')->group(function () {
+    Route::get('/api/all', [ClubController::class, 'apiIndex'])->name('api.index');
 
-Route::middleware(['auth'])->group(function () {
+    Route::get('/', [ClubController::class, 'index'])->name('index');
 
-    // Gestion des Catégories
-    Route::prefix('categories')->group(function () {
-        Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
-        Route::post('/', [CategoryController::class, 'store'])->name('categories.store');
-        Route::post('/quick', [CategoryController::class, 'storeQuick'])->name('categories.storeQuick');
-        Route::put('/{category}', [CategoryController::class, 'update'])->name('categories.update');
-        Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/create', [ClubController::class, 'create'])->name('create');
+        Route::post('/', [ClubController::class, 'store'])->name('store');
+
+        Route::prefix('{club:slug}')->group(function () {
+            Route::get('/edit', [ClubController::class, 'edit'])->name('edit');
+            Route::put('/', [ClubController::class, 'update'])->name('update');
+            Route::delete('/', [ClubController::class, 'destroy'])->name('destroy');
+
+            // Chat de club
+            Route::get('/chat/{conversation:slug}', [ConversationController::class, 'show'])
+                ->name('chat.show')
+                ->scopeBindings();;
+            Route::post('/conversations', [ConversationController::class, 'store'])->name('chat.conversations.store');
+        });
     });
 
-    // CRUD Clubs & Events (Admin)
-    Route::resource('events', EventController::class)->except(['index', 'show'])->parameters(['events' => 'event:slug']);
-    Route::resource('clubs', ClubController::class)->except(['index', 'show'])->parameters(['clubs' => 'club:slug']);
+    Route::get('/{club:slug}', [ClubController::class, 'show'])->name('show');
+});
 
-    // Administration Légale & Liens
-    Route::match(['post', 'put'], '/mentions-legales', [LegalController::class, 'updateLegal'])->name('legals.update');
-    Route::post('/mentions-legales/restore', [LegalController::class, 'restoreLegal'])->name('legals.restore');
+/*
+|--------------------------------------------------------------------------
+| 4. ÉVÉNEMENTS
+|--------------------------------------------------------------------------
+*/
+Route::prefix('events')->name('events.')->group(function () {
+    Route::get('/', [EventController::class, 'index'])->name('index');
 
-    Route::prefix('liens-utiles')->group(function () {
-        Route::get('/create', [LegalController::class, 'createLiens'])->name('liensUtiles.create');
-        Route::post('/', [LegalController::class, 'storeLiens'])->name('liensUtiles.store');
-        Route::get('/{lienUtile}/edit', [LegalController::class, 'editLiens'])->name('liensUtiles.edit');
-        Route::patch('/{lienUtile}', [LegalController::class, 'updateLiens'])->name('liensUtiles.update');
-        Route::delete('/{lienUtile}', [LegalController::class, 'deleteLiens'])->name('liensUtiles.delete');
+    Route::middleware('auth')->group(function () {
+        Route::get('/create', [EventController::class, 'create'])->name('create');
+        Route::post('/', [EventController::class, 'store'])->name('store');
+
+        Route::prefix('{event:slug}')->group(function () {
+            Route::get('/edit', [EventController::class, 'edit'])->name('edit');
+            Route::put('/', [EventController::class, 'update'])->name('update');
+            Route::delete('/', [EventController::class, 'destroy'])->name('destroy');
+            Route::post('/join', [EventController::class, 'join'])->name('join');
+            Route::delete('/leave', [EventController::class, 'leave'])->name('leave');
+        });
     });
+
+    Route::get('/{event:slug}', [EventController::class, 'show'])->name('show');
+});
+
+/*
+|--------------------------------------------------------------------------
+| 5. COLLECTIONS & ÉLÉMENTS
+|--------------------------------------------------------------------------
+*/
+Route::prefix('collections')->name('collections.')->group(function () {
+    Route::get('/', [CollectController::class, 'listeCollec'])->name('listeCollec');
+
+    Route::middleware('auth')->group(function () {
+        Route::get('/create', [CollectController::class, 'createCollec'])->name('createCollec');
+        Route::post('/', [CollectController::class, 'storeCollec'])->name('storeCollec');
+
+        Route::prefix('{collection:slug}')->group(function () {
+            Route::get('/edit', [CollectController::class, 'editCollec'])->name('editCollec');
+            Route::patch('/', [CollectController::class, 'updateCollec'])->name('updateCollec');
+            Route::delete('/', [CollectController::class, 'deleteCollec'])->name('deleteCollec');
+
+            // Sous-ressources Éléments
+            Route::get('/elements/create', [CollectController::class, 'createElem'])->name('elements.createElem');
+            Route::post('/elements', [CollectController::class, 'storeElem'])->name('elements.storeElem');
+            Route::get('/elements', [CollectController::class, 'listeElem'])->name('elements.listeElem');
+            Route::get('/elements/{element:slug}', [CollectController::class, 'showElem'])->name('elements.show');
+            Route::get('/elements/{element:slug}/edit', [CollectController::class, 'editElem'])->name('elements.editElem');
+            Route::post('/elements/{element:slug}', [CollectController::class, 'updateElem'])->name('elements.updateElem');
+            Route::delete('/elements/{element:slug}', [CollectController::class, 'deleteElem'])->name('elements.deleteElem');
+        });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| 6. CATÉGORIES
+|--------------------------------------------------------------------------
+*/
+Route::prefix('categories')->name('categories.')->middleware('auth')->controller(CategoryController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/', 'store')->name('store');
+    Route::put('/{category}', 'update')->name('update');
+    Route::delete('/{category}', 'destroy')->name('destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
+| 7. LIENS UTILES & LÉGAL
+|--------------------------------------------------------------------------
+*/
+Route::prefix('liens-utiles')->name('liensUtiles.')->group(function () {
+    Route::get('/', [LegalController::class, 'showLiens'])->name('index');
+
+    Route::middleware('auth')->group(function () {
+        Route::get('/create', [LegalController::class, 'createLiens'])->name('create'); // AVANT le slug
+        Route::post('/', [LegalController::class, 'storeLiens'])->name('store');
+        Route::get('/{lienUtile}/edit', [LegalController::class, 'editLiens'])->name('edit');
+        Route::patch('/{lienUtile}', [LegalController::class, 'updateLiens'])->name('update');
+        Route::delete('/{lienUtile}', [LegalController::class, 'deleteLiens'])->name('delete');
+    });
+});
+
+Route::get('/mentions-legales', [LegalController::class, 'showLegal'])->name('legals.mentionsLegales');
+Route::get('/contact', [LegalController::class, 'showContact'])->name('legals.contacts');
+Route::middleware('auth')->match(['post', 'put'], '/mentions-legales', [LegalController::class, 'updateLegal'])->name('legals.update');
+
+/*
+|--------------------------------------------------------------------------
+| 8. BOUTIQUE (PANIER & PAIEMENT)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::controller(CartController::class)->prefix('panier')->name('cart.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/add/{element:id}', 'store')->name('add');
+        Route::patch('/update/{cartItem}', 'update')->name('update');
+        Route::delete('/remove/{cartItem}', 'destroy')->name('remove');
+    });
+
+    Route::controller(PaymentController::class)->group(function () {
+        Route::post('/payment/checkout', 'checkout')->name('checkout');
+        Route::get('/payment-success', 'success')->name('payment.success');
+        Route::get('/mes-commandes', 'history')->name('orders.history');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| 9. PROFIL & IDENTITÉ
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::controller(ProfileController::class)->group(function () {
+        Route::get('/profile', 'edit')->name('profile.edit');
+        Route::patch('/profile', 'update')->name('profile.update');
+        Route::delete('/profile', 'destroy')->name('profile.destroy');
+        Route::patch('/profile/address', 'updateAddress')->name('address.update');
+        Route::get('/profile/{id?}', 'show')->name('profile.show');
+    });
+
+    Route::post('/identity/verify', [IdentityController::class, 'verify'])->name('identity.verify');
+    Route::post('/identity/upload', [IdentityController::class, 'upload'])->name('identity.upload');
+    Route::get('/parametres/interface', fn() => Inertia::render('Settings/UISettings'))->name('ui.settings');
 });
 
 require __DIR__.'/auth.php';

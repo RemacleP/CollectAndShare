@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { Link } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { computed, ref } from 'vue';
-import FileUploader from '@/components/upload/FileUploader.vue';
-import { editCollec, listeCollec } from '@/routes/collections';
+import { Head, useForm, Link } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout.vue';
+import { computed } from 'vue';
+import { Button } from "@/components/ui/button";
 import PictureUploader from '@/components/upload/PictureUploader.vue';
+import { ArrowLeft, Save, LayoutGrid, Info, Tag, Users } from 'lucide-vue-next';
 
 interface Category {
     id: number;
@@ -16,175 +14,195 @@ interface Category {
 const props = defineProps<{
     collect: {
         id: number;
-        name?: string;
-        description?: string;
-        club_id?: number | null;
-        club_user_id?: number | null;
-        user_id?: number;
+        name: string;
+        description: string;
+        club_id: number | null;
+        club_user_id: number | null;
         slug: string;
-        image?: string | null;
-        categories?: Category[];
+        image: string | null;
+        categories: Category[];
     };
     clubs: Array<{ id: number; name: string }>;
-    club_users: Array<{ id: number; user?: { id: number; name: string } }>;
+    club_users: Array<{ id: number; user?: {
+        username: string; id: number;
+        } }>;
     categories: Category[];
     isUser: boolean;
     isClubManager: boolean;
 }>();
 
 const form = useForm({
+    // On ajoute explicitement _method pour le spoofing Laravel
+    _method: 'patch',
     name: props.collect.name,
     description: props.collect.description,
     club_id: props.collect.club_id,
     club_user_id: props.collect.club_user_id,
-    image: null,
+    image: null as File | null,
     delete_image: false,
     categories: props.collect.categories?.map((c) => c.id) || [],
 });
 
-//Gestion image
-const newImage = ref<File | null>(null);
-function handleFile(file: File) {
-    newImage.value = file;
-}
-function deleteImage() {
-    form.delete_image = true;
-    newImage.value = null;
-    form.image = null;
-}
+const handleFile = (file: File) => {
+    form.image = file;
+    form.delete_image = false;
+};
 
-function submit() {
-    if (newImage.value) {
-        form.image = newImage.value;
-        form.delete_image = false;
-    }
+const submit = () => {
+    // Utilise simplement props.collect.slug directement
     form.post(route('collections.updateCollec', props.collect.slug), {
-        _method: 'patch',
         forceFormData: true,
+        preserveScroll: true,
+        onStart: () => console.log("Envoi en cours..."),
+        onFinish: () => console.log("Terminé."),
+        onError: (e) => console.error("Erreurs :", e)
     });
-}
+};
 
 const breadcrumbs = computed(() => [
     { title: 'Accueil', href: route('home') },
-    { title: 'collections', href: listeCollec().url },
-    {
-        title: form.name
-            ? `Modification collection : ${form.name}`
-            : 'Modification collection',
-        href: editCollec(props.collect.slug).url,
-    },
+    { title: 'Collections', href: route('collections.listeCollec') },
+    { title: `Modifier : ${props.collect.name}` },
 ]);
 </script>
 
 <template>
-    <Head title="Collection - Édition">
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-    </Head>
+    <Head :title="`Modifier - ${form.name}`" />
 
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-6">
-            <h1 class="mb-4 text-2xl font-bold">Modifier la collection</h1>
+    <AuthenticatedLayout :breadcrumbs="breadcrumbs">
+        <div class="max-w-5xl mx-auto p-6">
 
-            <Link :href="route('collections.listeCollec')">
-                <button class="rounded bg-blue-600 px-4 py-2 text-white">
-                    Retour
-                </button>
-            </Link>
-
-            <form @submit.prevent="submit">
-                <div class="mb-3">
-                    <label class="font-semibold">Nouvelle image</label>
-                    <PictureUploader
-                        @file-selected="handleFile"
-                        :existing-image="`/storage/${props.collect.image}`"
-                    />
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Configuration</h1>
+                    <p class="text-sm text-gray-500 font-medium">Mise à jour de votre collection</p>
                 </div>
+                <Link :href="route('collections.listeCollec')">
+                    <Button variant="outline" class="rounded-xl hover:bg-gray-50 transition-colors">
+                        <ArrowLeft class="mr-2 h-4 w-4" /> Retour
+                    </Button>
+                </Link>
+            </div>
 
-                <div class="mb-3">
-                    <label class="font-semibold">Nom</label>
-                    <input
-                        v-model="form.name"
-                        class="w-full rounded border p-2"
-                        required
-                    />
-                </div>
+            <div v-if="Object.keys(form.errors).length > 0" class="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-2xl text-sm font-bold">
+                Certains champs comportent des erreurs. Veuillez vérifier le formulaire.
+            </div>
 
-                <div class="mb-3">
-                    <label class="font-semibold">Description</label>
-                    <textarea
-                        v-model="form.description"
-                        class="w-full rounded border p-2"
-                        required
-                    ></textarea>
-                </div>
+            <form @submit.prevent="submit" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                <div class="mb-3">
-                    <label class="font-semibold">Club</label>
-                    <input
-                        type="text"
-                        class="w-full rounded border p-2 "
-                        :value="clubs.find(c => c.id === form.club_id)?.name || 'Aucun'"
-                        disabled
-                    />
-                    <input
-                        type="hidden"
-                        v-model="form.club_id"
-                    />
-                </div>
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] border border-gray-100 dark:border-zinc-800 shadow-sm">
+                        <label class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6">
+                            <LayoutGrid class="h-3 w-3" /> Image de couverture
+                        </label>
 
-                <div class="mb-3">
-                    <label class="font-semibold">Propriétaire</label>
+                        <PictureUploader
+                            @file-selected="handleFile"
+                            :existing-image="props.collect.image ? `/storage/${props.collect.image}` : null"
+                        />
 
-                    <input
-                        type="text"
-                        class="w-full rounded border p-2"
-                        :value="club_users.find(cu => cu.id === form.club_user_id)?.user?.name || 'Aucun'"
-                        disabled
-                    />
-
-                    <input
-                        type="hidden"
-                        v-model="form.club_user_id"
-                    />
-                </div>
-
-
-                <!-- Categories -->
-                <div class="mb-3">
-                    <label class="font-semibold">Catégories</label>
-                    <div
-                        class="mt-2 grid grid-cols-2 gap-2 rounded border bg-gray-50 p-2 md:grid-cols-3"
-                    >
-                        <div
-                            v-for="category in categories"
-                            :key="category.id"
-                            class="flex items-center"
-                        >
-                            <input
-                                type="checkbox"
-                                :id="`cat-${category.id}`"
-                                :value="category.id"
-                                v-model="form.categories"
-                                class="focus:ring-opacity-50 mr-2 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200"
-                            />
-                            <label
-                                :for="`cat-${category.id}`"
-                                class="cursor-pointer text-sm text-gray-700 select-none"
-                            >
-                                {{ category.name }}
-                            </label>
-                        </div>
+                        <p class="mt-4 text-[10px] text-center text-gray-400 leading-relaxed italic">
+                            Format recommandé : Carré (1:1). <br> Taille max : 2MB.
+                        </p>
                     </div>
                 </div>
 
-                <button
-                    type="submit"
-                    class="rounded bg-orange-600 px-4 py-2 text-white"
-                >
-                    Sauvegarder
-                </button>
+                <div class="lg:col-span-2 space-y-6">
+
+                    <div class="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-zinc-800 shadow-sm space-y-6">
+                        <label class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-2">
+                            <Info class="h-3 w-3" /> Informations générales
+                        </label>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-400 ml-2 mb-1 block uppercase">Titre de la collection</label>
+                                <input
+                                    v-model="form.name"
+                                    class="w-full rounded-2xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-4 focus:ring-2 focus:ring-indigo-500 outline-none transition font-semibold"
+                                    required
+                                />
+                                <div v-if="form.errors.name" class="text-red-500 text-xs mt-1 ml-2 font-bold">{{ form.errors.name }}</div>
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-400 ml-2 mb-1 block uppercase">Description</label>
+                                <textarea
+                                    v-model="form.description"
+                                    rows="4"
+                                    class="w-full rounded-2xl border-gray-100 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 p-4 focus:ring-2 focus:ring-indigo-500 outline-none transition leading-relaxed"
+                                    required
+                                ></textarea>
+                                <div v-if="form.errors.description" class="text-red-500 text-xs mt-1 ml-2 font-bold">{{ form.errors.description }}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-50 dark:border-zinc-800">
+                            <div class="flex items-center gap-3 p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl">
+                                <Users class="h-5 w-5 text-gray-400" />
+                                <div>
+                                    <span class="block text-[10px] font-black text-gray-400 uppercase">Club référent</span>
+                                    <span class="text-sm font-bold">{{ clubs.find(c => c.id === form.club_id)?.name || 'Indépendant' }}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl">
+                                <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-black text-indigo-600 uppercase">
+                                    {{ club_users.find(cu => cu.id === form.club_user_id)?.user?.username?.charAt(0) || 'U' }}
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black text-gray-400 uppercase">Propriétaire</span>
+                                    <span class="text-sm font-bold">{{ club_users.find(cu => cu.id === form.club_user_id)?.user?.username || 'Inconnu' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-zinc-800 shadow-sm">
+                        <label class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6">
+                            <Tag class="h-3 w-3" /> Catégories & Thématiques
+                        </label>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div
+                                v-for="category in categories"
+                                :key="category.id"
+                                class="relative"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :id="`cat-${category.id}`"
+                                    :value="category.id"
+                                    v-model="form.categories"
+                                    class="peer hidden"
+                                />
+                                <label
+                                    :for="`cat-${category.id}`"
+                                    class="flex h-full cursor-pointer items-center justify-center rounded-xl border-2 border-gray-50 bg-gray-50 px-3 py-3 text-center text-xs font-bold text-gray-500 transition-all peer-checked:border-indigo-500 peer-checked:bg-indigo-50 peer-checked:text-indigo-600 dark:bg-zinc-800 dark:border-zinc-800 dark:peer-checked:bg-indigo-900/20"
+                                >
+                                    {{ category.name }}
+                                </label>
+                            </div>
+                        </div>
+                        <div v-if="form.errors.categories" class="text-red-500 text-xs mt-2 ml-2 font-bold">{{ form.errors.categories }}</div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-4 pt-4">
+                        <Link :href="route('collections.listeCollec')" class="text-sm font-bold text-gray-400 hover:text-gray-600 transition">
+                            Abandonner
+                        </Link>
+                        <Button
+                            type="button"
+                            @click="submit"
+                            :disabled="form.processing"
+                            class="rounded-2xl bg-orange-600 px-10 py-7 font-black text-white shadow-xl shadow-orange-100 hover:bg-orange-700 dark:shadow-none transition-all active:scale-95"
+                        >
+                            <Save class="mr-2 h-5 w-5" />
+                            {{ form.processing ? 'Enregistrement...' : 'Mettre à jour' }}
+                        </Button>
+                    </div>
+
+                </div>
             </form>
         </div>
-    </AppLayout>
+    </AuthenticatedLayout>
 </template>

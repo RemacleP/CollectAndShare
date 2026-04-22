@@ -46,4 +46,14 @@ class Club extends Model
     {
         return $this->hasMany(Event::class);
     }
+
+    public function conversations()
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'slug';
+    }
 }

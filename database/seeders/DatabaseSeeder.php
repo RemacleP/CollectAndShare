@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
         // 1. Création des Rôles
         $roles = [
             ['name' => 'admin', 'label' => 'Administrateur'],
-            ['name' => 'president', 'label' => 'Président'],
+            ['name' => 'responsable', 'label' => 'Responsable'],
             ['name' => 'member', 'label' => 'Membre'],
         ];
 
@@ -33,12 +33,14 @@ class DatabaseSeeder extends Seeder
             'firstname' => 'Pascal',
             'lastname' => 'Admin',
             'email' => 'admin@admin.be',
+            'is_admin' => true,
             'password' => Hash::make('Pascal01'),
             'email_verified_at' => now(),
         ]);
 
-        // Adresse de l'admin
+        // Adresse de l'admin (Type: Personnel)
         $admin->address()->create([
+            'type' => 'primary',
             'street' => 'Rue de la Loi',
             'number' => '16',
             'postal_code' => '1000',
@@ -54,15 +56,15 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($clubsData as $data) {
-            // Le slug est généré automatiquement par le modèle Club via booted()
             $club = Club::create([
                 'name' => $data['name'],
                 'description' => 'Un club passionnant pour partager nos découvertes.',
-                'email' => 'contact@' . ($data['pc']) . '.be', // Juste pour l'exemple
+                'email' => 'contact@' . strtolower(str_replace(' ', '', $data['city'])) . '.be',
             ]);
 
-            // Ajout de l'adresse du club
+            // Ajout de l'adresse du club (Type: Siège Social)
             $club->address()->create([
+                'type' => 'primary',
                 'street' => 'Rue de la Station',
                 'number' => rand(1, 50),
                 'postal_code' => $data['pc'],
@@ -73,7 +75,7 @@ class DatabaseSeeder extends Seeder
 
         $allClubs = Club::all();
 
-        // 4. Création des utilisateurs (user1@user.be -> user10@user.be)
+        // 4. Création des utilisateurs (10 membres)
         for ($i = 1; $i <= 10; $i++) {
             $user = User::create([
                 'username' => 'User' . $i,
@@ -84,8 +86,9 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
 
-            // Adresse de l'utilisateur
+            // Adresse de l'utilisateur (Type: Domicile)
             $user->address()->create([
+                'type' => 'primary',
                 'street' => 'Rue des Collectionneurs',
                 'number' => $i,
                 'postal_code' => '6700',
@@ -93,7 +96,7 @@ class DatabaseSeeder extends Seeder
                 'country' => 'Belgique',
             ]);
 
-            // Liaison aléatoire à un club
+            // Liaison au club
             $user->clubs()->attach($allClubs->random()->id, [
                 'role_id' => $roleMember->id
             ]);
@@ -103,5 +106,14 @@ class DatabaseSeeder extends Seeder
         $admin->clubs()->attach($allClubs->first()->id, [
             'role_id' => $roleAdmin->id
         ]);
+
+        foreach ($allClubs as $club) {
+            \App\Models\Conversation::create([
+                'club_id' => $club->id,
+                'title' => 'Général',
+                'slug' => 'general-' . $club->id,
+                'is_private' => false
+            ]);
+        }
     }
 }

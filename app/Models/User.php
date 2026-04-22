@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['username', 'firstname', 'lastname', 'email', 'password', 'phone', 'eid_number'])]
+#[Fillable(['username', 'firstname', 'lastname', 'email', 'password', 'phone','is_banned', 'eid_number'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -42,14 +42,16 @@ class User extends Authenticatable
     /**
      * Adresse de livraison (Lot Panier)
      */
+    public function addresses(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Address::class, 'addressable');
+    }
+
     public function shippingAddress(): MorphOne
     {
         return $this->morphOne(Address::class, 'addressable')->where('type', 'shipping');
     }
 
-    /**
-     * Adresse de facturation (Lot Panier)
-     */
     public function billingAddress(): MorphOne
     {
         return $this->morphOne(Address::class, 'addressable')->where('type', 'billing');
@@ -118,6 +120,13 @@ class User extends Authenticatable
         // Vérifie si l'utilisateur a le rôle admin (globalement)
         // Dans ton SQL, Pascal (ID 1) est admin.
         return $this->roles()->where('roles.name', $roleName)->exists();
+    }
+
+    public function conversations()
+    {
+        return $this->belongsToMany(Conversation::class)
+            ->withPivot('role')
+            ->withTimestamps();
     }
 
 }

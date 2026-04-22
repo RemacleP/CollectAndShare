@@ -8,12 +8,15 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class Address extends Model
 {
     protected $fillable = [
+        'type',
         'street',
         'number',
         'box',
         'postal_code',
         'city',
         'country',
+        'addressable_type',
+        'addressable_id',
     ];
 
     /**

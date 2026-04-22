@@ -85,9 +85,13 @@ const image = ref<File | null>(null);
 function handleFile(file: File) { image.value = file; }
 
 function submit() {
+    console.log("FONCTION SUBMIT DÉCLENCHÉE !"); // <--- ICI
     if (image.value) form.image = image.value;
-    // @ts-ignore
-    form.post(route('collections.storeCollec'), { forceFormData: true });
+    form.post(route('collections.storeCollec'), {
+        forceFormData: true,
+        onStart: () => console.log("Post démarré"),
+        onError: (e) => console.log("Erreurs:", e)
+    });
 }
 
 const newCategoryName = ref('');
@@ -139,7 +143,9 @@ const breadcrumbs = [
                     <Button variant="outline" class="rounded-xl">Retour</Button>
                 </Link>
             </div>
-
+            <div class="text-[10px] text-gray-400 bg-gray-100 p-2 rounded">
+                Debug : Club ID: {{ form.club_id }} | Club User ID: {{ form.club_user_id }} | Processing: {{ form.processing }}
+            </div>
             <form @submit.prevent="submit" class="space-y-6 bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700">
 
                 <div class="space-y-2">
@@ -227,7 +233,12 @@ const breadcrumbs = [
                     </div>
                 </div>
 
-                <Button type="submit" :disabled="form.processing || !form.club_user_id" class="w-full py-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-lg transition-all shadow-lg shadow-indigo-100 dark:shadow-none">
+                <Button
+                    type="button"
+                    @click="submit"
+                    :disabled="form.processing"
+                    class="w-full py-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-lg transition-all"
+                >
                     {{ form.processing ? 'Création en cours...' : 'Créer la collection' }}
                 </Button>
             </form>

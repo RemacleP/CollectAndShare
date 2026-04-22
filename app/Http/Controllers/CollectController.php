@@ -8,9 +8,11 @@ use App\Models\Collection;
 use App\Models\Element;
 use App\Models\Club;
 use App\Models\Category;
-use App\Models\ClubUserRole; // On utilise uniquement celui-ci
+use App\Models\ClubUserRole;
+use App\Models\ElementImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -18,33 +20,24 @@ class CollectController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * Liste toutes les collections (Vue publique/membre)
+     */
     public function listeCollec(Request $request)
     {
         $user = auth()->user();
-        $userId = $user?->id;
-
         $myCategories = Category::orderBy('name')->get();
 
-        // 1. On commence par une requête simple
-        $query = Collection::query();
+        $query = Collection::query()->with(['club', 'categories']);
 
-        // 2. On charge les relations en "Eager Loading" (LEFT JOIN automatique de Laravel)
-        // On retire club_user_role.user du with principal si c'est lui qui bloque
-        $query->with(['club', 'categories']);
-
-        // 3. Filtrage par catégorie (si demandé)
         if ($request->filled('category')) {
             $query->whereHas('categories', fn($q) => $q->where('categories.id', $request->category));
         }
 
-        // 4. On récupère les collections
         $collections = $query->latest()->get()->map(function ($collection) use ($user) {
-            // On charge la relation utilisateur manuellement ici pour éviter de casser la requête principale
             $collection->load('club_user_role.user');
-
-            // Correction de la Policy : on passe false si pas d'user
+            // La Policy gère l'accès Propriétaire OU Admin automatiquement
             $collection->can_edit = $user ? $user->can('update', $collection) : false;
-
             return $collection;
         });
 
@@ -53,11 +46,14 @@ class CollectController extends Controller
             'categories' => $myCategories,
             'filters' => $request->only(['category']),
             'open' => $request->open,
-            'userId' => $userId,
+            'userId' => $user?->id,
             'isAdmin' => $user?->is_admin ?? false,
         ]);
     }
 
+    /**
+     * Formulaire de création de collection
+     */
     public function createCollec()
     {
         $user = auth()->user();
@@ -69,17 +65,20 @@ class CollectController extends Controller
             'userClub' => $user->clubs()->first(),
             'userId' => $user->id,
             'isUser' => true,
-            'isClubManager' => (bool) $user->is_admin, // Correction ici
+            'isClubManager' => (bool) $user->is_admin,
         ]);
     }
 
+    /**
+     * Ajout rapide de catégorie via AJAX/JSON
+     */
     public function storeQuick(Request $request)
     {
         $request->validate(['name' => 'required|string|max:255|unique:categories,name']);
 
         $category = Category::create([
             'name' => $request->name,
-            'slug' => \Illuminate\Support\Str::slug($request->name),
+            'slug' => Str::slug($request->name),
             'is_active' => true
         ]);
 
@@ -89,18 +88,18 @@ class CollectController extends Controller
         ]);
     }
 
+    /**
+     * Enregistre une nouvelle collection
+     */
     public function storeCollec(CollectionRequest $request)
     {
         $data = $request->validated();
         $user = auth()->user();
 
-        // Récupération du lien Pivot via club_user_role
-        // On cherche la ligne qui lie cet utilisateur à ce club
         $pivot = ClubUserRole::where('club_id', $data['club_id'])
             ->where('user_id', $user->id)
             ->first();
 
-        // Si l'utilisateur n'est pas dans le club et n'est pas admin, on bloque
         if (!$pivot && !$user->is_admin) {
             return back()->withErrors(['club_id' => 'Vous devez appartenir à ce club pour y créer une collection.']);
         }
@@ -109,8 +108,6 @@ class CollectController extends Controller
             $data['image'] = $request->file('image')->store('collections', 'public');
         }
 
-        // Si c'est un admin qui crée mais qu'il n'est pas dans le club,
-        // on prend l'ID envoyé par le formulaire (si spécifié) ou null
         $clubUserId = $pivot ? $pivot->id : ($data['club_user_id'] ?? null);
 
         $collection = Collection::create([
@@ -119,7 +116,7 @@ class CollectController extends Controller
             'image' => $data['image'] ?? null,
             'club_id' => $data['club_id'],
             'club_user_id' => $clubUserId,
-            'slug' => \Illuminate\Support\Str::slug($data['name']) . '-' . rand(100, 999),
+            'slug' => Str::slug($data['name']) . '-' . rand(100, 999),
         ]);
 
         if ($request->has('categories')) {
@@ -129,121 +126,189 @@ class CollectController extends Controller
         return redirect()->route('collections.listeCollec')->with('success', "Collection créée !");
     }
 
-    public function editCollec(Collection $currentCollect)
+    /**
+     * Formulaire d'édition d'une collection
+     */
+    public function editCollec(Collection $collection)
     {
-        // Attention : Vérifie que ta Policy CollectionPolicy est à jour avec club_user_role
-        $this->authorize('update', $currentCollect);
+        $this->authorize('update', $collection);
 
         $user = auth()->user();
-        $currentCollect->load(['club', 'club_user_role.user', 'categories']);
+        $collection->load(['club', 'club_user_role.user', 'categories']);
 
         return Inertia::render('collections/editCollec', [
-            'collect' => $currentCollect,
+            'collect' => $collection,
             'clubs' => $user->is_admin ? Club::all() : $user->clubs,
             'categories' => Category::all(),
+            'club_users' => ClubUserRole::with('user')->get(),
+            'isUser' => $user->id === $collection->club_user_role?->user_id,
+            'isClubManager' => (bool) $user->is_admin,
         ]);
     }
 
-
-    public function updateCollec(CollectionRequest $request, Collection $currentCollect)
+    /**
+     * Mise à jour d'une collection
+     */
+    public function updateCollec(CollectionRequest $request, Collection $collection)
     {
-        $this->authorize('update', $currentCollect);
+        $this->authorize('update', $collection);
 
         $data = $request->validated();
 
         if ($request->boolean('delete_image')) {
-            if ($currentCollect->image) Storage::disk('public')->delete($currentCollect->image);
+            if ($collection->image) Storage::disk('public')->delete($collection->image);
             $data['image'] = null;
         } elseif ($request->hasFile('image')) {
-            if ($currentCollect->image) Storage::disk('public')->delete($currentCollect->image);
+            if ($collection->image) Storage::disk('public')->delete($collection->image);
             $data['image'] = $request->file('image')->store('collections', 'public');
+        } else {
+            unset($data['image']);
         }
 
-        $currentCollect->update($data);
-        $currentCollect->categories()->sync($request->input('categories', []));
+        $collection->update($data);
+        $collection->categories()->sync($request->input('categories', []));
 
         return redirect()->route('collections.listeCollec')->with('success', "Collection mise à jour !");
     }
 
-    public function deleteCollec(Collection $currentCollect)
+    /**
+     * Suppression d'une collection
+     */
+    public function deleteCollec(Collection $collection)
     {
-        $this->authorize('delete', $currentCollect);
+        $this->authorize('delete', $collection);
 
-        if ($currentCollect->image) Storage::disk('public')->delete($currentCollect->image);
-        $currentCollect->delete();
+        if ($collection->image) Storage::disk('public')->delete($collection->image);
+        $collection->delete();
 
         return redirect()->route('collections.listeCollec')->with('success', "Collection supprimée.");
     }
 
-    // --- ELEMENTS ---
+    // --- GESTION DES ÉLÉMENTS (OBJETS) ---
 
-    public function listeElem(Collection $currentCollect, Request $request)
+    /**
+     * Liste des éléments d'une collection spécifique
+     */
+    public function listeElem(Collection $collection, Request $request)
     {
-        $currentCollect->load(['elements', 'club_user.user', 'club']);
-
-        $user = auth()->user();
-        $canManage = $user ? $user->can('update', $currentCollect) : false;
+        $collection->load(['elements.images', 'club_user_role.user', 'club']);
 
         return Inertia::render('elements/listeElem', [
-            'collect' => $currentCollect,
-            'elements' => $currentCollect->elements,
-            'canManage' => $canManage,
+            'collect' => $collection,
+            'elements' => $collection->elements,
             'userId' => auth()->id(),
+            'collectionOwnerUserId' => $collection->club_user_role?->user_id,
+            'isAdmin' => auth()->user()?->is_admin ?? false,
         ]);
     }
 
-    public function createElem(Collection $currentCollect)
+    /**
+     * Formulaire de création d'un élément
+     */
+    public function createElem(Collection $collection)
     {
-        $this->authorize('update', $currentCollect);
-
-        return Inertia::render('elements/createElem', [
-            'collect' => $currentCollect,
-        ]);
+        $this->authorize('update', $collection);
+        return Inertia::render('elements/createElem', ['collect' => $collection]);
     }
 
-    public function storeElem(ElementRequest $request, Collection $currentCollect)
+    /**
+     * Enregistre un nouvel élément dans la collection
+     */
+    public function storeElem(ElementRequest $request, Collection $collection)
     {
-        $this->authorize('update', $currentCollect);
-
+        $this->authorize('update', $collection);
         $data = $request->validated();
-        if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('elements', 'public');
+
+        $data['slug'] = Str::slug($data['label']) . '-' . uniqid();
+        $element = $collection->elements()->create($data);
+
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                $path = $file->store('elements', 'public');
+                $element->images()->create(['path' => $path]);
+            }
         }
 
-        $currentCollect->elements()->create($data);
-
-        return redirect()->route('elements.listeElem', $currentCollect->slug)
+        return redirect()->route('elements.listeElem', $collection->slug)
             ->with('success', "Élément ajouté !");
     }
 
-    public function updateElem(ElementRequest $request, Collection $currentCollect, Element $currentElem)
+    /**
+     * Affiche un élément précis (Show)
+     */
+    public function showElem(Collection $collection, Element $element)
     {
-        $this->authorize('update', $currentCollect);
+        $user = auth()->user();
+        $element->load(['images', 'collection.club_user_role']);
 
-        $data = $request->validated();
-
-        if ($request->boolean('delete_image')) {
-            if ($currentElem->image) Storage::disk('public')->delete($currentElem->image);
-            $data['image'] = null;
-        } elseif ($request->hasFile('image')) {
-            if ($currentElem->image) Storage::disk('public')->delete($currentElem->image);
-            $data['image'] = $request->file('image')->store('elements', 'public');
-        }
-
-        $currentElem->update($data);
-
-        return redirect()->route('elements.listeElem', $currentCollect->slug)
-            ->with('success', "Élément modifié !");
+        return Inertia::render('elements/showElem', [
+            'collect' => $collection,
+            'element' => $element,
+            'can_edit' => $user ? $user->can('update', $collection) : false,
+        ]);
     }
 
-    public function deleteElem(Collection $currentCollect, Element $currentElem)
+    /**
+     * Formulaire d'édition d'un élément
+     */
+    public function editElem(Collection $collection, Element $element)
     {
-        $this->authorize('update', $currentCollect);
+        $this->authorize('update', $collection);
+        $element->load('images');
 
-        if ($currentElem->image) Storage::disk('public')->delete($currentElem->image);
-        $currentElem->delete();
+        return Inertia::render('elements/editElem', [
+            'collect' => $collection,
+            'element' => $element,
+        ]);
+    }
 
-        return redirect()->route('elements.listeElem', $currentCollect->slug)
+    /**
+     * Mise à jour d'un élément
+     */
+    public function updateElem(ElementRequest $request, Collection $collection, Element $element)
+    {
+        $this->authorize('update', $collection);
+        $data = $request->validated();
+
+        $element->update($data);
+
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                $path = $file->store('elements', 'public');
+                $element->images()->create(['path' => $path]);
+            }
+        }
+
+        // Si tu as une logique de suppression d'images spécifiques (ElementImage)
+        if ($request->has('remove_images')) {
+            $imagesToDelete = \App\Models\ElementImage::whereIn('id', $request->remove_images)
+                ->where('element_id', $element->id)
+                ->get();
+            foreach ($imagesToDelete as $img) {
+                Storage::disk('public')->delete($img->path);
+                $img->delete();
+            }
+        }
+
+        return redirect()->route('elements.listeElem', $collection->slug)
+            ->with('success', "Élément mis à jour !");
+    }
+
+    /**
+     * Suppression d'un élément
+     */
+    public function deleteElem(Collection $collection, Element $element)
+    {
+        $this->authorize('update', $collection);
+
+        $element->load('images');
+        foreach ($element->images as $img) {
+            Storage::disk('public')->delete($img->path);
+        }
+
+        $element->delete();
+
+        return redirect()->route('elements.listeElem', $collection->slug)
             ->with('success', "Élément supprimé.");
     }
 }

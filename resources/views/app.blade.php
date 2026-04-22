@@ -2,6 +2,18 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
+        <script>
+            (function() {
+                const theme = localStorage.getItem('theme') || 'system';
+                if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            })();
+        </script>
+
+
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
