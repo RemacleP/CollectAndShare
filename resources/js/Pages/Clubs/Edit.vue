@@ -1,5 +1,5 @@
 <script setup>
-import { Head, useForm } from '@inertiajs/vue3';
+import {Head, router, useForm} from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
@@ -7,7 +7,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import * as LucideIcons from 'lucide-vue-next';
-import { Globe, X, Plus, GripVertical } from 'lucide-vue-next';
+import {Globe, X, Plus, GripVertical, ChevronLeft} from 'lucide-vue-next';
+import {route} from "ziggy-js";
 
 const props = defineProps({
     club: Object,
@@ -65,6 +66,13 @@ const submit = () => {
         preserveScroll: true,
     });
 };
+const goBack = () => {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        router.visit(route('clubs.index'));
+    }
+};
 </script>
 
 <template>
@@ -72,9 +80,18 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Modifier le club : {{ club.name }}
-            </h2>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                    Modifier le club : {{ club.name }}
+                </h2>
+                <button
+                    @click="goBack"
+                    class="group flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors"
+                >
+                    <ChevronLeft class="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                    Retour
+                </button>
+            </div>
         </template>
 
         <div class="py-12">

@@ -5,7 +5,7 @@ import GuestLayout from '@/Layouts/GuestLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import { User, Building2, Loader2, Info, AtSign, PlusCircle, MapPin, Notebook } from 'lucide-vue-next';
+import {User, Building2, Loader2, Info, AtSign, PlusCircle, MapPin, Notebook, ChevronLeft} from 'lucide-vue-next';
 import axios from 'axios';
 
 const clubs = ref([]);
@@ -67,8 +67,22 @@ const submit = () => {
 </script>
 
 <template>
+    <Head title="Demande d'inscription" />
     <GuestLayout>
-        <Head title="Demande d'inscription" />
+        <template #header>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                    Demande d'inscription
+                </h2>
+                <button
+                    @click="goBack"
+                    class="group flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors"
+                >
+                    <ChevronLeft class="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                    Retour
+                </button>
+            </div>
+        </template>
 
         <div class="pt-8 text-center flex flex-col items-center">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-zinc-900 dark:text-white">Collect & Share</h1>

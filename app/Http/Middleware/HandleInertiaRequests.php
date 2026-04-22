@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
                     'lastname'  => $user->lastname,
                     'username'  => $user->username,
                     'email'     => $user->email,
+                    'theme' => $request->user()->theme,
                     // Utilise ta méthode de modèle pour le check admin
                     'is_admin'  => $user->isSuperAdmin(),
                     // Récupération des IDs de clubs pour les accès rapides

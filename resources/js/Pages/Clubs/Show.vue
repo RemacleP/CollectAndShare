@@ -2,7 +2,6 @@
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-// Import des icônes de base + Globe pour le fallback + Tout le dictionnaire pour le dynamisme
 import * as LucideIcons from 'lucide-vue-next';
 import {
     ChevronLeft,
@@ -16,22 +15,27 @@ import {
 
 const props = defineProps({
     club: Object,
-    can: Object // Reçoit { edit: boolean }
+    can: Object // { edit: boolean }
 });
 
 const page = usePage();
-const authUser = computed(() => page.props.auth.user);
+
+// Sécurisation : authUser peut être null si le visiteur n'est pas connecté
+const authUser = computed(() => page.props.auth?.user || null);
 
 /**
  * RÉCUPÉRATION DYNAMIQUE DES ICÔNES
- * Cherche l'icône dans la bibliothèque par son nom (ex: "Music2")
- * Si elle n'existe pas ou n'est pas définie, renvoie l'icône Globe.
  */
 const getSocialIcon = (iconName) => {
     return LucideIcons[iconName] || Globe;
 };
 
+/**
+ * Sécurisation de la vérification de membre
+ * On vérifie d'abord si authUser existe avant d'accéder à son ID
+ */
 const isClubMember = computed(() => {
+    if (!authUser.value) return false;
     return props.club.members?.some(member => member.id === authUser.value.id);
 });
 
@@ -48,12 +52,14 @@ const goBack = () => {
 };
 
 const formatDate = (dateStr) => {
+    if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('fr-FR', {
         day: 'numeric', month: 'short'
     });
 };
 
 const formatTime = (dateStr) => {
+    if (!dateStr) return '';
     return new Date(dateStr).toLocaleTimeString('fr-FR', {
         hour: '2-digit', minute: '2-digit'
     });
@@ -121,7 +127,7 @@ const formatTime = (dateStr) => {
                                 </p>
                             </div>
 
-                            <div v-if="isClubMember || can.edit" class="pt-4">
+                            <div v-if="authUser && (isClubMember || can.edit)" class="pt-4">
                                 <Link
                                     v-if="defaultChatSlug"
                                     :href="route('clubs.chat.show', { club: club.slug, conversation: defaultChatSlug })"
@@ -137,6 +143,12 @@ const formatTime = (dateStr) => {
 
                                 <p class="text-[10px] text-zinc-400 font-bold uppercase mt-3 ml-1 tracking-wider">
                                     Espace réservé aux membres
+                                </p>
+                            </div>
+
+                            <div v-else-if="!authUser" class="pt-4 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                <p class="text-sm text-gray-500 italic">
+                                    Connectez-vous pour rejoindre ce club et accéder au chat privé.
                                 </p>
                             </div>
                         </div>

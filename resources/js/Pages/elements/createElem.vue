@@ -34,14 +34,8 @@ const handleFile = (file: File) => {
 const submit = () => {
     form.post(route('elements.storeElem', props.collect.slug), {
         forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            console.log("Success!");
-        },
-        onError: (errors) => {
-            // C'EST ICI QUE TU VERRAS LE PROBLÈME
-            console.log("Détails des erreurs de validation:", errors);
-        },
+        onSuccess: () => console.log("Enregistré !"),
+        onError: (err) => console.error("Erreurs de validation :", err),
     });
 };
 
@@ -52,9 +46,9 @@ const breadcrumbs = computed(() => [
 ]);
 
 const conditions = [
-    { value: 'new', label: 'Neuf' },
-    { value: 'used', label: 'Utilisé' },
-    { value: 'damaged', label: 'Endommagé' }
+    { value: 'Nouveau', label: 'Neuf' },
+    { value: 'Utilisé', label: 'Utilisé' },
+    { value: 'Endommagé', label: 'Endommagé' }
 ];
 </script>
 

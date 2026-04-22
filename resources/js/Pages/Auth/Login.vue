@@ -3,8 +3,9 @@ import Checkbox from '@/Components/Checkbox.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { LogIn, Mail, Lock, Loader2, AlertCircle, Settings } from 'lucide-vue-next';
+import {Head, Link, router, useForm} from '@inertiajs/vue3';
+import {LogIn, Mail, Lock, Loader2, AlertCircle, Settings, ChevronLeft} from 'lucide-vue-next';
+import {route} from "ziggy-js";
 
 defineProps({
     canResetPassword: {
@@ -26,12 +27,32 @@ const submit = () => {
         onFinish: () => form.reset('password'),
     });
 };
+const goBack = () => {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        router.visit(route('clubs.index'));
+    }
+};
 </script>
 
 <template>
     <GuestLayout>
         <Head title="Connexion" />
-
+        <template #header>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                    Demande d'inscription
+                </h2>
+                <button
+                    @click="goBack"
+                    class="group flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors"
+                >
+                    <ChevronLeft class="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                    Retour
+                </button>
+            </div>
+        </template>
         <div class="mb-8 flex flex-col items-center">
 
 

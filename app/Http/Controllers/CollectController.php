@@ -217,15 +217,29 @@ class CollectController extends Controller
     public function storeElem(ElementRequest $request, Collection $collection)
     {
         $this->authorize('update', $collection);
+
         $data = $request->validated();
-        //dd($data);
         $data['slug'] = Str::slug($data['label']) . '-' . uniqid();
+
+        // 1. On crée l'élément d'abord
         $element = $collection->elements()->create($data);
 
+        // 2. On gère les images (on utilise la clé 'images' du form)
         if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
+            $files = $request->file('images');
+
+            // On force en tableau si c'est un fichier unique
+            if (!is_array($files)) {
+                $files = [$files];
+            }
+
+            foreach ($files as $file) {
                 $path = $file->store('elements', 'public');
-                $element->images()->create(['path' => $path]);
+                // On crée l'entrée dans la table element_images
+                $element->images()->create([
+                    'path' => $path,
+                    'is_main' => false // ou true selon ta logique
+                ]);
             }
         }
 

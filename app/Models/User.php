@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['username', 'firstname', 'lastname', 'email', 'password', 'phone','is_banned', 'eid_number'])]
+#[Fillable(['username', 'firstname', 'lastname', 'email', 'password', 'phone','is_banned', 'eid_number','theme'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -127,6 +127,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Conversation::class)
             ->withPivot('role')
             ->withTimestamps();
+    }
+
+    public function socialLinks()
+    {
+        // MorphMany permet de lier plusieurs lignes de social_links à ce club
+        return $this->morphMany(SocialLink::class, 'linkable');
     }
 
 }

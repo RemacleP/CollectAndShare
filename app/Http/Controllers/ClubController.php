@@ -86,10 +86,12 @@ class ClubController extends Controller
                 ]),
 
                 'members' => $club->users->map(fn($u) => [
-                    'id' => $u->id,
-                    'full_name' => "{$u->firstname} {$u->lastname}",
-                    'username' => $u->username,
+                    'id'        => $u->id,
+                    'firstname' => $u->firstname,
+                    'lastname'  => $u->lastname,
+                    'username'  => $u->username,
                     'club_role' => $u->roles->firstWhere('id', $u->pivot->role_id)?->label ?? 'Membre',
+                    'is_super_admin' => $u->is_admin, // Pour le badge "Staff"
                 ]),
                 'conversations' => $club->conversations->map(fn($c) => [
                     'id' => $c->id, 'title' => $c->title, 'slug' => $c->slug,
@@ -152,9 +154,9 @@ class ClubController extends Controller
                 }
             }
 
-            $presidentRole = Role::where('name', 'president')->first();
-            if ($presidentRole) {
-                $club->users()->attach(Auth::id(), ['role_id' => $presidentRole->id]);
+            $responsableRole = Role::where('name', 'responsable')->first();
+            if ($responsableRole) {
+                $club->users()->attach(Auth::id(), ['role_id' => $responsableRole->id]);
             }
 
             return redirect()->route('clubs.show', $club->slug)->with('success', 'Club créé !');
@@ -167,7 +169,7 @@ class ClubController extends Controller
     public function edit(Club $club)
     {
         $user = Auth::user();
-        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'president')->exists()) {
+        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'responsable')->exists()) {
             abort(403);
         }
 
@@ -183,7 +185,7 @@ class ClubController extends Controller
     public function update(Request $request, Club $club)
     {
         $user = Auth::user();
-        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'president')->exists()) {
+        if (!$user->is_admin && !$user->roles()->where('club_id', $club->id)->where('name', 'responsable')->exists()) {
             abort(403);
         }
 

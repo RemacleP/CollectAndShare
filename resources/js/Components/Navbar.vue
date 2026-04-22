@@ -10,7 +10,8 @@ import {
     Settings,
     LogOut,
     User as UserIcon,
-    Tag,
+    Users,
+    Palette,
     ShoppingBag,
     Mail
 } from 'lucide-vue-next';
@@ -92,7 +93,7 @@ const totalNotifications = computed(() => {
                     </Link>
 
                     <div v-if="user" class="relative ms-2">
-                        <Dropdown align="right" width="48">
+                        <Dropdown align="right" width="56">
                             <template #trigger>
                                 <button class="flex items-center gap-2 p-1 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 text-sm font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-750 transition-all group">
                                     <div class="h-7 w-7 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm uppercase group-hover:scale-105 transition-transform">
@@ -111,18 +112,29 @@ const totalNotifications = computed(() => {
                                 <DropdownLink :href="route('profile.edit')" class="flex items-center gap-2">
                                     <UserIcon class="w-4 h-4 opacity-70" /> Paramètres Profil
                                 </DropdownLink>
-
-                                <DropdownLink :href="route('categories.index')" class="flex items-center gap-2">
-                                    <Tag class="w-4 h-4 opacity-70" /> Mes Catégories
+                                <DropdownLink :href="route('settings.ui.index')" class="flex items-center gap-2">
+                                    <Palette class="w-4 h-4 opacity-70" /> Apparence & UI
                                 </DropdownLink>
+                                <template v-if="user.is_admin">
+                                    <div class="border-t border-zinc-100 dark:border-zinc-800 my-1"></div>
+                                    <div class="px-4 py-2 text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-black tracking-widest">
+                                        Administration
+                                    </div>
 
-                                <DropdownLink v-if="user.is_admin" :href="route('admin.settings.index')" class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold">
-                                    <Settings class="w-4 h-4 opacity-70" /> Config. Plateforme
-                                </DropdownLink>
+                                    <DropdownLink :href="route('admin.users.index')" class="flex items-center gap-2">
+                                        <Users class="w-4 h-4 opacity-70" /> Gestion Utilisateurs
+                                    </DropdownLink>
+
+
+
+                                    <DropdownLink :href="route('admin.settings.index')" class="flex items-center gap-2 font-bold text-zinc-700 dark:text-zinc-200">
+                                        <Settings class="w-4 h-4 opacity-70" /> Config. Plateforme
+                                    </DropdownLink>
+                                </template>
 
                                 <div class="border-t border-zinc-100 dark:border-zinc-800 my-1"></div>
 
-                                <DropdownLink :href="route('logout')" method="post" as="button" class="text-red-600 dark:text-red-400 flex items-center gap-2">
+                                <DropdownLink :href="route('logout')" method="post" as="button" class="text-red-600 dark:text-red-400 flex items-center gap-2 w-full text-left">
                                     <LogOut class="w-4 h-4" /> Déconnexion
                                 </DropdownLink>
                             </template>

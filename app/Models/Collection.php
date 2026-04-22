@@ -11,7 +11,7 @@ class Collection extends Model
 {
     protected $primaryKey = 'id';
     protected $fillable = ['name', 'description', 'club_id', 'club_user_id', 'image', 'slug'];
-    public $timestamps = false;
+    public $timestamps = true;
 
 // La collection appartient à un membre d'un club (pivot club_user_role)
     public function clubUser()

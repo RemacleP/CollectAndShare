@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 class Element extends Model
 
 {
-    public $timestamps = false;
+    public $timestamps = true;
     protected $fillable = [
         'label',
         'description',

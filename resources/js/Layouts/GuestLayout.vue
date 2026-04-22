@@ -6,6 +6,11 @@ import { Link } from '@inertiajs/vue3';
 
 <template>
     <Navbar />
+    <header v-if="$slots.header" class="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            <slot name="header" />
+        </div>
+    </header>
     <div
         class="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0"
     >

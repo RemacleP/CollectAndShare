@@ -1,36 +1,64 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { usePage, Link } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import Footer from '@/Components/Footer.vue';
 import FlashMessage from '@/Components/FlashMessage.vue';
 import {
     LayoutDashboard, ShieldCheck, FileText, ExternalLink,
-    Users, Settings, ChevronDown, Plus,Check , List, ArrowRight,
+    Users, Settings, ChevronDown, Plus, Check, List, ArrowRight,
     Calendar, Palette, Image as ImageIcon
 } from 'lucide-vue-next';
-import {route} from "ziggy-js";
+import { route } from "ziggy-js";
 
 const page = usePage();
 const isAdmin = computed(() => !!page.props.auth.user?.is_admin);
 
-// Gestion de l'ouverture des menus (Dropdowns)
+/**
+ * LOGIQUE DU THÈME (BASÉE SUR L'UTILISATEUR)
+ * On récupère le thème depuis page.props.auth.user.theme (configuré via Inertia Share)
+ */
+const applyTheme = (theme) => {
+    const html = document.documentElement;
+
+    if (theme === 'dark') {
+        html.classList.add('dark');
+    } else if (theme === 'light') {
+        html.classList.remove('dark');
+    } else {
+        // Mode Système
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+    }
+};
+
+// Surveillance du changement de thème en temps réel (quand l'utilisateur sauvegarde)
+watch(() => page.props.auth.user?.theme, (newTheme) => {
+    applyTheme(newTheme);
+}, { immediate: true });
+
+/**
+ * GESTION DE LA SIDEBAR ET MENUS
+ */
+const sidebarVisible = ref(true);
+
 const openMenus = ref({
     clubs: route().current('clubs.*'),
     liens: route().current('liensUtiles.*'),
     legals: route().current('legals.*'),
     collections: route().current('collections.*'),
     users: route().current('admin.users.*'),
-    settings: route().current('admin.settings.*') // Ajout pour la configuration
+    settings: route().current('admin.settings.*')
 });
 
 const toggleMenu = (menu) => {
     openMenus.value[menu] = !openMenus.value[menu];
 };
 
-const sidebarVisible = ref(true);
-
-// Configuration des menus
+// Configuration de la navigation Admin
 const adminNavigation = [
     {
         name: 'Dashboard',
@@ -98,7 +126,6 @@ const adminNavigation = [
             { name: 'Modifier', href: route('legals.mentionsLegales', { edit: 'true' }), icon: Plus, active: null }
         ]
     },
-    // NOUVELLE SECTION : CONFIGURATION
     {
         name: 'Configuration',
         icon: Settings,
@@ -111,14 +138,21 @@ const adminNavigation = [
                 icon: ImageIcon,
                 active: 'admin.settings.index'
             },
-            /* Tu pourras ajouter "Couleurs" ici plus tard */
         ]
     }
 ];
 
 onMounted(() => {
+    // La visibilité de la sidebar peut rester en local car c'est une préférence de confort immédiat
     const storedSidebar = localStorage.getItem('showSidebar');
     sidebarVisible.value = storedSidebar !== null ? JSON.parse(storedSidebar) : true;
+
+    // Écouteur pour le mode système si l'utilisateur est en mode 'system'
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (page.props.auth.user?.theme === 'system') {
+            applyTheme('system');
+        }
+    });
 });
 </script>
 

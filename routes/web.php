@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Collection;
+use App\Models\Element;
+use App\Models\User;
 use App\Http\Controllers\{InternalMailController,
     ProfileController,
     IdentityController,
@@ -32,9 +35,40 @@ Route::get('/', function () {
         'canRegister'    => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion'     => PHP_VERSION,
-        'topClubs' => Club::withCount(['users as users_count' => function($query) {
+
+        // --- DONNÉES POUR LE CARROUSEL DYNAMIQUE ---
+
+        // Le dernier club créé
+        'latestClub' => Club::latest()->first(),
+
+        // Le dernier utilisateur inscrit (pour le mot de bienvenue)
+        'latestUser' => User::select('id', 'firstname', 'lastname')->latest()->first(),
+
+        // Le tout dernier objet ajouté
+        'latestElement' => Element::with('collection')->latest()->first(),
+
+        // --- DONNÉES POUR LES COLONNES ---
+
+        // 1. Les 10 dernières collections
+        'latestCollections' => Collection::with('club')
+            ->latest()
+            ->take(10)
+            ->get(),
+
+        // 2. Top Clubs (le plus populaire en premier)
+        'topClubs' => Club::with(['address']) // Ajout de l'adresse pour le design responsive
+        ->withCount(['users as users_count' => function($query) {
             $query->select(DB::raw('count(distinct(user_id))'));
-        }])->orderBy('users_count', 'desc')->take(3)->get(),
+        }])
+            ->orderBy('users_count', 'desc')
+            ->take(5) // On en prend 5 pour remplir un peu plus la colonne centrale
+            ->get(),
+
+        // 3. Les 10 derniers objets
+        'latestElems' => Element::with(['collection', 'images'])
+            ->latest()
+            ->take(10)
+            ->get(),
     ]);
 })->name('welcome');
 
@@ -152,11 +186,17 @@ Route::prefix('collections')->name('collections.')->group(function () {
 });
 
 // 2. Eléments
+
+// --- ROUTES PUBLIQUES (Accessibles à tous) ---
+Route::prefix('collections/{collection:slug}/elements')->name('elements.')->group(function () {
+    Route::get('/', [CollectController::class, 'listeElem'])->name('listeElem');
+    Route::get('/{element:slug}', [CollectController::class, 'showElem'])->name('show');
+});
+
+// --- ROUTES PRIVÉES (Connexion requise) ---
 Route::middleware(['auth'])->prefix('collections/{collection:slug}/elements')->name('elements.')->group(function () {
-    Route::get('/', [CollectController::class, 'listeElem'])->name('listeElem'); // Devient elements.listeElem
     Route::get('/create', [CollectController::class, 'createElem'])->name('createElem');
     Route::post('/', [CollectController::class, 'storeElem'])->name('storeElem');
-    Route::get('/{element:slug}', [CollectController::class, 'showElem'])->name('show');
     Route::get('/{element:slug}/edit', [CollectController::class, 'editElem'])->name('editElem');
     Route::post('/{element:slug}', [CollectController::class, 'updateElem'])->name('updateElem');
     Route::delete('/{element:slug}', [CollectController::class, 'deleteElem'])->name('deleteElem');
@@ -225,12 +265,18 @@ Route::middleware('auth')->group(function () {
         Route::patch('/profile', 'update')->name('profile.update');
         Route::delete('/profile', 'destroy')->name('profile.destroy');
         Route::patch('/profile/address', 'updateAddress')->name('address.update');
+        Route::patch('/profile/socials', [ProfileController::class, 'updateSocials'])->name('profile.socials.update');
         Route::get('/profile/{id?}', 'show')->name('profile.show');
     });
 
     Route::post('/identity/verify', [IdentityController::class, 'verify'])->name('identity.verify');
     Route::post('/identity/upload', [IdentityController::class, 'upload'])->name('identity.upload');
     Route::get('/parametres/interface', fn() => Inertia::render('Settings/UISettings'))->name('ui.settings');
+
+    Route::get('/parametres/apparence', function () {
+        return Inertia::render('Settings/UISettings');
+    })->name('settings.ui.index');
+    Route::patch('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.update-theme');
 });
 
 require __DIR__.'/auth.php';
